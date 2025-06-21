@@ -1,9 +1,20 @@
 import torch
+from src.evaluate import evaluate_at_k
 
-def train_rbm(rbm, train_tensor, batch_size=32, epochs=20, lr=0.001, verbose=True):
+def train_rbm(rbm, train_tensor, test_tensor, 
+              epochs=20, batch_size=32, learning_rate=0.001, k=10, device='cpu'):
+    rbm.to(device)
+    train_tensor = train_tensor.to(device)
+    test_tensor = test_tensor.to(device)
 
-    #optimizer = torch.optim.SGD(rbm.parameters(), lr=lr)
-    optimizer = torch.optim.Adam(rbm.parameters(), lr=lr, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(rbm.parameters(), lr=learning_rate, weight_decay=1e-5)
+
+    losses, precs, maps, ndcgs = [], [], [], []
+
+    best_map = 0.0
+    patience = 3
+    patience_counter = 0
+    best_model_state = None
 
     for epoch in range(epochs):
         rbm.train()
@@ -11,28 +22,50 @@ def train_rbm(rbm, train_tensor, batch_size=32, epochs=20, lr=0.001, verbose=Tru
         num_batches = 0
 
         for i in range(0, train_tensor.size(0), batch_size):
-            optimizer.zero_grad()
-
             v0 = train_tensor[i:i+batch_size]
             ph0, _ = rbm.sample_h(v0)
-            
-            # CD-1
-            vk = v0.clone().detach()
-            _, hk = rbm.sample_h(vk)
-            _, vk = rbm.sample_v(hk)
+            _, vk = rbm.sample_v(ph0)
             phk, _ = rbm.sample_h(vk)
-            
-            batch_size = v0.size(0)
-            rbm.W.grad     = -(ph0.t() @ v0 - phk.t() @ vk) / batch_size
+            vk = torch.clamp(vk, 0.0, 1.0)
+
+            batch_size_actual = v0.size(0)
+
+            rbm.W.grad = -(ph0.t() @ v0 - phk.t() @ vk) / batch_size_actual
             rbm.v_bias.grad = -(v0 - vk).mean(dim=0)
             rbm.h_bias.grad = -(ph0 - phk).mean(dim=0)
 
             optimizer.step()
+            optimizer.zero_grad()
 
             loss = torch.mean((v0 - vk) ** 2)
             epoch_loss += loss.item()
             num_batches += 1
 
-        epoch_loss = epoch_loss / num_batches
+        epoch_loss /= num_batches
+        losses.append(epoch_loss)
 
-        print(f"Epoch {epoch+1} | Loss: {epoch_loss:.4f}")
+        # Evaluation
+        rbm.eval()
+        with torch.no_grad():
+            precision, mean_ap, mean_ndcg = evaluate_at_k(rbm, train_tensor, test_tensor, k=k)
+            precs.append(precision)
+            maps.append(mean_ap)
+            ndcgs.append(mean_ndcg)
+
+        if mean_ap > best_map:
+            best_map = mean_ap
+            patience_counter = 0
+            best_model_state = rbm.state_dict()
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print("Early stopping triggered.")
+                break
+
+        print(f"Epoch {epoch+1:02d} | Loss: {epoch_loss:.4f} | "
+            f"Precision@{k}: {precision:.4f} | MAP@{k}: {mean_ap:.4f} | NDCG@{k}: {mean_ndcg:.4f}")
+
+    if best_model_state is not None:
+        torch.save(best_model_state, "rbm_best_model.pth")
+        print(f"Best model saved with MAP@{k}: {best_map:.4f}")
+    return rbm, losses, precs, maps, ndcgs
