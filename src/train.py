@@ -28,11 +28,16 @@ def train_rbm(rbm, train_tensor, test_tensor,
             phk, _ = rbm.sample_h(vk)
             vk = torch.clamp(vk, 0.0, 1.0)
 
-            batch_size_actual = v0.size(0)
+            positive_grad = torch.bmm(ph0.unsqueeze(2), v0.unsqueeze(1))
+            negative_grad = torch.bmm(phk.unsqueeze(2), vk.unsqueeze(1))
 
-            rbm.W.grad = -(ph0.t() @ v0 - phk.t() @ vk) / batch_size_actual
-            rbm.v_bias.grad = -(v0 - vk).mean(dim=0)
-            rbm.h_bias.grad = -(ph0 - phk).mean(dim=0)
+            dW = (positive_grad - negative_grad).mean(0)
+            dv_bias = (v0 - vk).mean(0)
+            dh_bias = (ph0 - phk).mean(0)
+
+            rbm.W.grad = -dW
+            rbm.v_bias.grad = -dv_bias
+            rbm.h_bias.grad = -dh_bias
 
             optimizer.step()
             optimizer.zero_grad()
@@ -47,7 +52,7 @@ def train_rbm(rbm, train_tensor, test_tensor,
         # Evaluation
         rbm.eval()
         with torch.no_grad():
-            precision, mean_ap, mean_ndcg = evaluate_at_k(rbm, train_tensor, test_tensor, k=k)
+            precision, mean_ap, mean_ndcg = evaluate_at_k(rbm, train_tensor, test_tensor, k=k, device=device)
             precs.append(precision)
             maps.append(mean_ap)
             ndcgs.append(mean_ndcg)

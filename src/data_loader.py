@@ -3,7 +3,6 @@ import glob
 import pandas as pd
 import numpy as np
 import kagglehub
-import torch
 from src.utils import filter_hentai
 os.environ["KAGGLEHUB_CACHE"] = "./data"
 

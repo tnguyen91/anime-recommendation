@@ -1,7 +1,9 @@
 import torch
 
-def evaluate_at_k(rbm, train_tensor, test_tensor, k=10):
+def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
     rbm.eval()
+    train_tensor = train_tensor.to(device)
+    test_tensor = test_tensor.to(device)
     with torch.no_grad():
         p_h, _ = rbm.sample_h(train_tensor)
         p_v, _ = rbm.sample_v(p_h)
@@ -39,7 +41,6 @@ def evaluate_at_k(rbm, train_tensor, test_tensor, k=10):
         average_precisions.append(average_precision)
 
         # NDCG@K
-        device = hits.device  # ensure consistent device
         gains = hits / torch.log2(torch.arange(2, k + 2, device=device).float())
         dcg = gains.sum().item()
         ideal_hits = torch.ones(min(len(held_out), k), device=device)

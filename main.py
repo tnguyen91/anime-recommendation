@@ -2,7 +2,6 @@ from src.data_loader import load_anime_dataset
 from src.utils import preprocess_data, make_train_test_split, get_recommendations
 from src.model import RBM
 from src.train import train_rbm
-from src.evaluate import evaluate_at_k
 import torch
 import numpy as np
 import pandas as pd
@@ -19,7 +18,6 @@ LEARNING_RATE = 0.001
 K = 10
 
 def main():
-
     print("Loading data...")
     ratings, anime = load_anime_dataset()
     user_anime, rating = preprocess_data(ratings)
@@ -31,13 +29,17 @@ def main():
     held_out_counts = test.sum(axis=1)
     print(pd.Series(held_out_counts).describe())
 
-    print("Training...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Training...(using {device})")
 
-    train_tensor = torch.FloatTensor(train.values)
-    test_tensor = torch.FloatTensor(test)
+    train_tensor = torch.FloatTensor(train.values).to(device)
+    test_tensor = torch.FloatTensor(test).to(device)
 
-    rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=512)
+    rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=512).to(device)
+    if torch.cuda.is_available():
+        print(torch.cuda.get_device_name(0))
+        print(f"Memory Allocated: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
+        print(f"Memory Cached: {torch.cuda.memory_reserved() / 1024**2:.1f} MB")
 
     rbm, losses, precs, maps, ndcgs = train_rbm(
         rbm, train_tensor, test_tensor,
@@ -59,34 +61,38 @@ def main():
     plt.legend()
     plt.grid(True)
     plt.show()
+    plt.savefig("training_metrics.png")
 
 
+    user_ids = list(user_anime.index)
+    input_tensor = torch.FloatTensor(train.values).to(device)
+
+    with torch.no_grad():
+        p_h, _ = rbm.sample_h(input_tensor)
+        p_v, _ = rbm.sample_v(p_h)
+        p_v[input_tensor == 1] = -1e6  # mask already-liked
+
+    scores = p_v.cpu().numpy()
     anime_ids = list(user_anime.columns)
     recommendation_rows = []
 
-    for user_id in user_anime.index:
-        input_vector = train.loc[user_id].values.astype(np.float32)
+    for i, user_id in enumerate(user_ids):
+        user_scores = scores[i]
+        top_indices = user_scores.argsort()[::-1][:10]
+        top_anime_ids = [anime_ids[j] for j in top_indices]
 
-        user_index = list(user_anime.index).index(user_id)
-        held_out_vector = test[user_index].astype(int)
-
-        recs = get_recommendations(input_vector, rbm, anime_ids, anime_df=anime, top_n=10, device=device)
-        recs = recs.reset_index()
-
+        held_out_vector = test[i].astype(int)
         held_out_indices = np.where(held_out_vector == 1)[0]
-        held_out_ids = [anime_ids[i] for i in held_out_indices]
+        held_out_ids = [anime_ids[j] for j in held_out_indices]
 
-        recs['is_held_out'] = recs['MAL_ID'].isin(held_out_ids)
-
-        for _, row in recs.iterrows():
+        for j, anime_id in zip(top_indices, top_anime_ids):
             recommendation_rows.append({
                 'user_id': user_id,
-                'anime_id': row['MAL_ID'],
-                'anime_name': row['Name'],
-                'predicted_score': row['score'],
-                'is_held_out': row['is_held_out']
+                'anime_id': anime_id,
+                'anime_name': anime.loc[anime['MAL_ID'] == anime_id, 'Name'].values[0] if anime_id in anime['MAL_ID'].values else 'Unknown',
+                'predicted_score': user_scores[j],
+                'is_held_out': anime_id in held_out_ids
             })
-
     recommendation_df = pd.DataFrame(recommendation_rows)
     recommendation_df.to_csv("recommendations.csv", index=False)
     print("Recommendations saved to recommendations.csv")
