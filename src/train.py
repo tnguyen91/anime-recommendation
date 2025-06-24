@@ -71,6 +71,7 @@ def train_rbm(rbm, train_tensor, test_tensor,
             f"Precision@{k}: {precision:.4f} | MAP@{k}: {mean_ap:.4f} | NDCG@{k}: {mean_ndcg:.4f}")
 
     if best_model_state is not None:
+        rbm.load_state_dict(best_model_state)
         torch.save(best_model_state, "rbm_best_model.pth")
         print(f"Best model saved with MAP@{k}: {best_map:.4f}")
     return rbm, losses, precs, maps, ndcgs
