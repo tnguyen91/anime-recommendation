@@ -20,7 +20,7 @@ K = 10
 def main():
     print("Loading data...")
     ratings, anime = load_anime_dataset()
-    user_anime, rating = preprocess_data(ratings)
+    user_anime, _ = preprocess_data(ratings)
     print(user_anime.shape)
     print(ratings.shape)
 
@@ -43,10 +43,10 @@ def main():
 
     rbm, losses, precs, maps, ndcgs = train_rbm(
         rbm, train_tensor, test_tensor,
-        epochs=20,
-        batch_size=32,
-        learning_rate=0.001,
-        k=10,
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE,
+        learning_rate=LEARNING_RATE,
+        k=K,
         device=device
     )
 
@@ -60,8 +60,8 @@ def main():
     plt.title("RBM Training Metrics")
     plt.legend()
     plt.grid(True)
-    plt.show()
     plt.savefig("training_metrics.png")
+    plt.show()
 
 
     user_ids = list(user_anime.index)
