@@ -1,5 +1,5 @@
 from src.data_loader import load_anime_dataset
-from src.utils import preprocess_data, make_train_test_split, get_recommendations
+from src.utils import preprocess_data, make_train_test_split, get_recommendations, generate_recommendations_csv
 from src.model import RBM
 from src.train import train_rbm
 import torch
@@ -63,39 +63,7 @@ def main():
     plt.show()
     plt.savefig("training_metrics.png")
 
-
-    user_ids = list(user_anime.index)
-    input_tensor = torch.FloatTensor(train.values).to(device)
-
-    with torch.no_grad():
-        p_h, _ = rbm.sample_h(input_tensor)
-        p_v, _ = rbm.sample_v(p_h)
-        p_v[input_tensor == 1] = -1e6  # mask already-liked
-
-    scores = p_v.cpu().numpy()
-    anime_ids = list(user_anime.columns)
-    recommendation_rows = []
-
-    for i, user_id in enumerate(user_ids):
-        user_scores = scores[i]
-        top_indices = user_scores.argsort()[::-1][:10]
-        top_anime_ids = [anime_ids[j] for j in top_indices]
-
-        held_out_vector = test[i].astype(int)
-        held_out_indices = np.where(held_out_vector == 1)[0]
-        held_out_ids = [anime_ids[j] for j in held_out_indices]
-
-        for j, anime_id in zip(top_indices, top_anime_ids):
-            recommendation_rows.append({
-                'user_id': user_id,
-                'anime_id': anime_id,
-                'anime_name': anime.loc[anime['MAL_ID'] == anime_id, 'Name'].values[0] if anime_id in anime['MAL_ID'].values else 'Unknown',
-                'predicted_score': user_scores[j],
-                'is_held_out': anime_id in held_out_ids
-            })
-    recommendation_df = pd.DataFrame(recommendation_rows)
-    recommendation_df.to_csv("recommendations.csv", index=False)
-    print("Recommendations saved to recommendations.csv")
+    generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device, top_n=10, filename="recommendations.csv")
 
 if __name__ == "__main__":
     main()

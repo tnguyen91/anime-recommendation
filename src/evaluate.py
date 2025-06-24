@@ -54,3 +54,4 @@ def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
     mean_ndcg = float(sum(ndcgs) / len(ndcgs)) if ndcgs else 0.0
 
     return mean_precision, mean_map, mean_ndcg
+

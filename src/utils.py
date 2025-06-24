@@ -67,3 +67,42 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device
     recommended['score'] = scores[top_indices]
 
     return recommended[['Name', 'score']]
+
+def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df,
+                                 device='cpu', top_n=10, filename="recommendations.csv"):
+    rbm.eval()
+    user_ids = list(user_anime.index)
+    input_tensor = torch.FloatTensor(train_df.values).to(device)
+
+    with torch.no_grad():
+        p_h, _ = rbm.sample_h(input_tensor)
+        p_v, _ = rbm.sample_v(p_h)
+        p_v[input_tensor == 1] = -1e6  # mask already-liked
+
+    scores = p_v.cpu().numpy()
+    anime_ids = list(user_anime.columns)
+    recommendation_rows = []
+
+    for i, user_id in enumerate(user_ids):
+        user_scores = scores[i]
+        top_indices = user_scores.argsort()[::-1][:top_n]
+        top_anime_ids = [anime_ids[j] for j in top_indices]
+
+        held_out_vector = test_array[i].astype(int)
+        held_out_indices = np.where(held_out_vector == 1)[0]
+        held_out_ids = [anime_ids[j] for j in held_out_indices]
+
+        for j, anime_id in zip(top_indices, top_anime_ids):
+            recommendation_rows.append({
+                'user_id': user_id,
+                'anime_id': anime_id,
+                'anime_name': anime_df.loc[anime_df['MAL_ID'] == anime_id, 'Name'].values[0]
+                              if anime_id in anime_df['MAL_ID'].values else 'Unknown',
+                'predicted_score': user_scores[j],
+                'is_held_out': anime_id in held_out_ids
+            })
+
+    recommendation_df = pd.DataFrame(recommendation_rows)
+    recommendation_df.to_csv(filename, index=False)
+    print(f"Recommendations saved to {filename}")
+    return recommendation_df
