@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import argparse
 
 # === Configuration ===
 SEED = 1234
@@ -19,14 +20,14 @@ K = 10
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
-def search_anime(anime_df, query, limit=5):
+def search_anime(anime_df, query):
     """Search anime by query in 'Name', 'English name', and 'Japanese name' columns."""
     name_cols = ["Name", "English name", "Japanese name"]
     mask = False
     for col in name_cols:
         mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
     matches = anime_df[mask]
-    return matches[["MAL_ID"] + name_cols].head(limit)
+    return matches[["MAL_ID"] + name_cols].head()
 
 def make_input_vector(liked_anime_ids, anime_ids):
     """Create a binary vector for the RBM given user liked anime IDs."""
@@ -78,7 +79,14 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.savefig("training_metrics.png")
     plt.show()
 
-def main(train_model=True, run_cli=True):
+def main(train_model=True,
+         run_cli=True,
+         n_hidden=512,
+         epochs=20,
+         batch_size=32,
+         learning_rate=0.001,
+         k=10,
+         model_path='rbm_best_model.pth'):
     print("Loading data...")
     ratings, anime = load_anime_dataset()
     user_anime, _ = preprocess_data(ratings)
@@ -96,7 +104,7 @@ def main(train_model=True, run_cli=True):
     train_tensor = torch.FloatTensor(train.values).to(device)
     test_tensor = torch.FloatTensor(test).to(device)
 
-    rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=N_HIDDEN).to(device)
+    rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
 
     if train_model:
         if torch.cuda.is_available():
@@ -105,17 +113,15 @@ def main(train_model=True, run_cli=True):
             print(f"Memory Cached: {torch.cuda.memory_reserved() / 1024**2:.1f} MB")
         rbm, losses, precs, maps, ndcgs = train_rbm(
             rbm, train_tensor, test_tensor,
-            epochs=EPOCHS,
-            batch_size=BATCH_SIZE,
-            learning_rate=LEARNING_RATE,
-            k=K,
+            epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            k=k,
             device=device
         )
         plot_training_metrics(losses, precs, maps, ndcgs, K)
         generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device)
     else:
-        # LOAD TRAINED MODEL WEIGHTS
-        model_path = "rbm_best_model.pth"
         if os.path.exists(model_path):
             rbm.load_state_dict(torch.load(model_path, map_location=device))
             print(f"Loaded trained RBM from {model_path}")
@@ -126,4 +132,24 @@ def main(train_model=True, run_cli=True):
         interactive_recommender(user_anime, anime, rbm, device, top_n=10)
 
 if __name__ == "__main__":
-    main(train_model=False)
+    parser = argparse.ArgumentParser(description="Anime Recommendation System (RBM)")
+    parser.add_argument('--train', action='store_true', help="Train the RBM model")
+    parser.add_argument('--no-cli', action='store_true', help="Do not launch the interactive CLI recommender")
+    parser.add_argument('--epochs', type=int, default=20, help="Number of training epochs")
+    parser.add_argument('--batch-size', type=int, default=32, help="Training batch size")
+    parser.add_argument('--learning-rate', type=float, default=0.001, help="Training learning rate")
+    parser.add_argument('--n-hidden', type=int, default=512, help="Number of hidden units in RBM")
+    parser.add_argument('--k', type=int, default=10, help="Top-K for evaluation/metrics")
+    parser.add_argument('--model-path', type=str, default='rbm_best_model.pth', help="Path to save/load RBM model")
+    args = parser.parse_args()
+
+    main(
+        train_model=args.train,
+        run_cli=not args.no_cli,
+        n_hidden=args.n_hidden,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        k=args.k,
+        model_path=args.model_path
+    )
