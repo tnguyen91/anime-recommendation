@@ -1,0 +1,15 @@
+model:
+  n_hidden: 512
+  learning_rate: 0.001
+  batch_size: 16
+  epochs: 20
+  k: 10
+
+data:
+  holdout_ratio: 0.1
+  min_likes_user: 700
+  min_likes_anime: 100
+
+paths:
+  model_path: "rbm_best_model.pth"
+  output_csv: "recommendations.csv"

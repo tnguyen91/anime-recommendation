@@ -8,20 +8,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import argparse
+import yaml
 
-# === Configuration ===
+# Load config
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+model_config = config["model"]
+data_config = config["data"]
+path_config = config["paths"]
 SEED = 1234
-N_HIDDEN = 512
-EPOCHS = 20
-BATCH_SIZE = 32
-LEARNING_RATE = 0.001
-K = 10
 
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
 def search_anime(anime_df, query):
-    """Search anime by query in 'Name', 'English name', and 'Japanese name' columns."""
     name_cols = ["Name", "English name", "Japanese name"]
     mask = False
     for col in name_cols:
@@ -30,11 +31,9 @@ def search_anime(anime_df, query):
     return matches[["MAL_ID"] + name_cols].head()
 
 def make_input_vector(liked_anime_ids, anime_ids):
-    """Create a binary vector for the RBM given user liked anime IDs."""
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def interactive_recommender(user_anime, anime, rbm, device, top_n=10):
-    """CLI for user-driven recommendations."""
     anime_ids = list(user_anime.columns)
     liked_anime_ids = []
 
@@ -89,12 +88,12 @@ def main(train_model=True,
          model_path='rbm_best_model.pth'):
     print("Loading data...")
     ratings, anime = load_anime_dataset()
-    user_anime, _ = preprocess_data(ratings)
+    user_anime, _ = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
     print("user_anime shape:", user_anime.shape)
     print("ratings shape:", ratings.shape)
 
     print("Creating train-test split...")
-    train, test = make_train_test_split(user_anime, holdout_ratio=0.1)
+    train, test = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
     held_out_counts = test.sum(axis=1)
     print("Test split stats:\n", pd.Series(held_out_counts).describe())
 
@@ -146,10 +145,10 @@ if __name__ == "__main__":
     main(
         train_model=args.train,
         run_cli=not args.no_cli,
-        n_hidden=args.n_hidden,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        learning_rate=args.learning_rate,
-        k=args.k,
-        model_path=args.model_path
+        n_hidden=args.n_hidden if args.n_hidden != 512 else model_config["n_hidden"],
+        epochs=args.epochs if args.epochs != 20 else model_config["epochs"],
+        batch_size=args.batch_size if args.batch_size != 32 else model_config["batch_size"],
+        learning_rate=args.learning_rate if args.learning_rate != 0.001 else model_config["learning_rate"],
+        k=args.k if args.k != 10 else model_config["k"],
+        model_path=args.model_path if args.model_path != 'rbm_best_model.pth' else path_config["model_path"]
     )
