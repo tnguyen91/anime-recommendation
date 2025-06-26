@@ -6,9 +6,9 @@ from src.model import RBM
 from src.train import train_rbm
 
 param_grid = {
-    "n_hidden": [128, 256, 512],
-    "learning_rate": [0.01, 0.001],
-    "batch_size": [16, 32],
+    "n_hidden": [128, 256, 512, 1024],
+    "learning_rate": [0.01, 0.001, 0.0001],
+    "batch_size": [16, 32, 64],
 }
 
 # Load data
