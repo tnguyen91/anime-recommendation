@@ -28,7 +28,7 @@ def search_anime(anime_df, query):
     for col in name_cols:
         mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
     matches = anime_df[mask]
-    return matches[["MAL_ID"] + name_cols].head()
+    return matches[["MAL_ID"] + name_cols]
 
 def make_input_vector(liked_anime_ids, anime_ids):
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
@@ -110,6 +110,7 @@ def main(train_model=True,
             print(torch.cuda.get_device_name(0))
             print(f"Memory Allocated: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
             print(f"Memory Cached: {torch.cuda.memory_reserved() / 1024**2:.1f} MB")
+        print(f"Training hyperparameter: \nepochs-{epochs}    batch_size-{batch_size}    learning_rate-{learning_rate}   n_hidden-{n_hidden}")
         rbm, losses, precs, maps, ndcgs = train_rbm(
             rbm, train_tensor, test_tensor,
             epochs=epochs,
@@ -118,7 +119,7 @@ def main(train_model=True,
             k=k,
             device=device
         )
-        plot_training_metrics(losses, precs, maps, ndcgs, K)
+        plot_training_metrics(losses, precs, maps, ndcgs, k)
         generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device)
     else:
         if os.path.exists(model_path):
