@@ -4,6 +4,8 @@ from src.data_loader import load_anime_dataset
 from src.utils import preprocess_data, make_train_test_split
 from src.model import RBM
 from src.train import train_rbm
+import csv
+import os
 
 param_grid = {
     "n_hidden": [128, 256, 512, 1024],
@@ -32,7 +34,7 @@ for combo in itertools.product(*param_grid.values()):
         rbm,
         train_tensor.to(device),
         test_tensor.to(device),
-        epochs=5,  # Use small number for tuning
+        epochs=15,  # Use small number for tuning
         batch_size=batch_size,
         learning_rate=learning_rate,
         k=10,
@@ -47,6 +49,13 @@ for combo in itertools.product(*param_grid.values()):
             "learning_rate": learning_rate,
             "batch_size": batch_size
         }
+
+    write_header = not os.path.exists("tuning_results.csv")
+    with open("tuning_results.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        if write_header:
+            writer.writerow(["n_hidden", "learning_rate", "batch_size", "map_at_10"])
+        writer.writerow([n_hidden, learning_rate, batch_size, final_map])
 
 print("\nBest config:", best_params)
 print("Best MAP@10:", best_map)
