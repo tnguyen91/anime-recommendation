@@ -1,0 +1,86 @@
+body {
+  background-image: url("/home/tun/projects/anime-recommendation/anime-recommender-ui/public/bg.png");
+  background-size: cover;
+  background-position: center;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  height: 100vh;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: #f0f0f0;
+}
+
+.title {
+  color: #5b53e4;
+  font-size: 32px;
+  text-align: center;
+}
+
+.subtitle {
+  color: #5b7ab4;
+  font-size: 20px;
+  margin: 10px;
+}
+
+.text {
+  color: #799ac7;
+  font-size: 16px;
+  margin: 10px;
+}
+
+.anime-button {
+  margin: 10px;
+  padding: 10px 15px;
+  border: 1px solid #888;
+  border-radius: 5px;
+  background-color: #fff;
+  color: #000;
+  cursor: pointer;
+}
+
+.anime-button.selected {
+  background-color: #3f51b5;
+  color: #fff;
+}
+
+.button {
+  margin-top: 15px;
+  margin: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #3388a4;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+input[type="text"] {
+  font-size: 16px;
+  border: 1px solid #2f90b4;
+  border-radius: 4px;
+}
+
+.anime-list-item.selected span {
+  font-weight: bold;
+  color: #2a5e8a;
+}
+
+.anime-list-item {
+  transition: background-color 0.2s ease;
+}
+
+.anime-list-item:hover {
+  background-color: #eef4f7;
+}
