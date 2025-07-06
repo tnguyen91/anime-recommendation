@@ -61,10 +61,9 @@ function App() {
       </button>
 
       <ul style={{ listStyleType: "none", padding: 0, marginTop: "20px" }}>
-        {/* Show selected items on top */}
         {selectedAnime
           .filter(
-            (selected) => !searchResults.some((anime) => anime.Name === selected)
+            (selected) => !searchResults.some((anime) => anime.name === selected)
           )
           .map((name) => (
             <li
@@ -85,16 +84,15 @@ function App() {
             </li>
           ))}
 
-        {/* Show search results */}
         {searchResults.map((anime) => {
-          const isSelected = selectedAnime.includes(anime.Name);
-          const engName = anime["English name"];
-          const showEng = engName && engName !== "Unknown" && engName !== anime.Name;
+          const isSelected = selectedAnime.includes(anime.name);
+          const engName = anime["title_english"];
+          const showEng = engName && engName !== "Unknown" && engName !== anime.name;
 
           return (
             <li
-              key={anime.MAL_ID}
-              onClick={() => handleClick(anime.Name)}
+              key={anime.anime_id}
+              onClick={() => handleClick(anime.name)}
               className={`anime-list-item ${isSelected ? "selected" : ""}`}
               style={{
                 cursor: "pointer",
@@ -105,7 +103,7 @@ function App() {
                 backgroundColor: isSelected ? "#d1e7f0" : "#f9f9f9",
               }}
             >
-              <strong>{anime.Name}</strong>
+              <strong>{anime.name}</strong>
               {showEng && (
                 <span style={{ color: "#888", marginLeft: "8px" }}>
                   ({engName})
@@ -125,18 +123,18 @@ function App() {
       </button>
 
       {recommendations.length > 0 && (
-        <div className="text" style={{ marginTop: "30px" }}>
-          <h3>Recommended Anime:</h3>
-          <ul>
+        <div className="recommendation-section">
+          <h3 className="subtitle">Recommended Anime:</h3>
+          <div className="scroll-row">
             {recommendations.map((anime, index) => (
-              <li key={index}>
-                <strong>{anime.Name}</strong>{" "}
-                <span style={{ color: "#888" }}>(Score: {anime.score})</span>
-              </li>
+              <div className="anime-card" key={index}>
+                <div className="card-title">{anime.name}</div>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
+
     </div>
   );
 }

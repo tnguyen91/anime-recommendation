@@ -1,11 +1,10 @@
 from src.data_loader import load_anime_dataset
-from src.utils import preprocess_data, make_train_test_split, get_recommendations, generate_recommendations_csv
+from src.utils import preprocess_data, make_train_test_split, generate_recommendations_csv, plot_training_metrics, interactive_recommender
 from src.model import RBM
 from src.train import train_rbm
 import torch
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import os
 import argparse
 import yaml
@@ -21,62 +20,6 @@ SEED = 1234
 
 np.random.seed(SEED)
 torch.manual_seed(SEED)
-
-def search_anime(anime_df, query):
-    name_cols = ["Name", "English name", "Japanese name"]
-    mask = False
-    for col in name_cols:
-        mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
-    matches = anime_df[mask]
-    return matches[["MAL_ID"] + name_cols]
-
-def make_input_vector(liked_anime_ids, anime_ids):
-    return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
-
-def interactive_recommender(user_anime, anime, rbm, device, top_n=10):
-    anime_ids = list(user_anime.columns)
-    liked_anime_ids = []
-
-    print("\n=== Anime Recommendation CLI ===")
-    print("Search and select anime you like (press Enter without typing to finish):")
-    while True:
-        query = input("\nSearch anime: ").strip()
-        if not query:
-            break
-        results = search_anime(anime, query)
-        if results.empty:
-            print("No matches found. Try another keyword.")
-            continue
-        print(results)
-        chosen = input("Type the MAL_IDs (comma separated) of anime you like: ").strip()
-        if chosen:
-            liked_anime_ids.extend([int(id_) for id_ in chosen.split(",") if id_.isdigit()])
-
-    liked_anime_ids = list(set(liked_anime_ids))
-    if not liked_anime_ids:
-        print("No anime selected. Exiting recommender.")
-        return
-
-    input_vector = make_input_vector(liked_anime_ids, anime_ids)
-    input_vector_tensor = torch.FloatTensor(input_vector).to(device)
-    recs = get_recommendations(input_vector_tensor, rbm, anime_ids, anime, top_n=top_n, device=device)
-    print("\n=== Top Recommendations for You ===")
-    print(recs)
-    return recs
-
-def plot_training_metrics(losses, precs, maps, ndcgs, K):
-    plt.figure(figsize=(10, 6))
-    plt.plot(losses, label="Loss")
-    plt.plot(precs, label=f"Precision@{K}")
-    plt.plot(maps, label=f"MAP@{K}")
-    plt.plot(ndcgs, label=f"NDCG@{K}")
-    plt.xlabel("Epoch")
-    plt.ylabel("Metric")
-    plt.title("RBM Training Metrics")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig("training_metrics.png")
-    plt.show()
 
 def main(train_model=True,
          run_cli=True,

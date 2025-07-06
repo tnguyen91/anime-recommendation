@@ -5,7 +5,6 @@ from src.data_loader import load_anime_dataset
 from src.utils import preprocess_data, get_recommendations, make_train_test_split
 from src.model import RBM
 import yaml
-import pandas as pd
 
 # Load config
 with open("config.yaml", "r") as f:
@@ -40,10 +39,10 @@ def make_input_vector(liked_anime_ids, anime_ids):
 @app.route('/recommend', methods=['POST'])
 def recommend():
     data = request.get_json()
-    liked_titles = data.get("liked_anime", [])
+    liked_anime = data.get("liked_anime", [])
 
     # Match titles to MAL_IDs
-    matched_ids = anime_df[anime_df["Name"].isin(liked_titles)]["MAL_ID"].tolist()
+    matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
     if not matched_ids:
         return jsonify({"error": "No matching anime found"}), 400
 
@@ -63,21 +62,20 @@ def recommend():
     return jsonify({"recommendations": recommendations.to_dict(orient="records")})
 
 @app.route('/search-anime', methods=['GET'])
-def search_anime_titles():
+def search_anime():
     query = request.args.get('query', '').strip()
 
     if not query:
         return jsonify({"results": []})
 
-    name_cols = ["Name", "English name", "Japanese name"]
+    name_cols = ["name", "title_english", "title_japanese"]
 
     mask = False
     for col in name_cols:
         mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
 
-    matches = anime_df[mask][["MAL_ID", "Name", "English name"] + name_cols].dropna()
+    matches = anime_df[mask][["anime_id", "name", "title_english"] + name_cols].dropna()
 
-    # Format result for frontend (we only return 'Name' in the UI for now)
     results = matches.to_dict(orient="records")
 
     return jsonify({"results": results})

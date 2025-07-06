@@ -1,5 +1,5 @@
 body {
-  background-image: url("/home/tun/projects/anime-recommendation/anime-recommender-ui/public/bg.png");
+  background-image: url("../public/bg.png");
   background-size: cover;
   background-position: center;
   font-family: Arial, sans-serif;
@@ -83,4 +83,47 @@ input[type="text"] {
 
 .anime-list-item:hover {
   background-color: #eef4f7;
+}
+
+.recommendation-section {
+  margin-top: 30px;
+}
+
+.scroll-row {
+  display: flex;
+  overflow-x: auto;
+  padding: 10px 0;
+  gap: 16px;
+}
+
+.anime-card {
+  min-width: 160px;
+  height: 120px;
+  background: #1c1c1c;
+  color: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.3s ease;
+}
+
+.anime-card:hover {
+  transform: scale(1.05);
+  background: #2a2a2a;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.card-score {
+  font-size: 0.9rem;
+  color: #aaa;
 }

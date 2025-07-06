@@ -1,14 +1,14 @@
 model:
   n_hidden: 1024
   learning_rate: 0.001
-  batch_size: 64
-  epochs: 20
+  batch_size: 32
+  epochs: 30
   k: 10
 
 data:
   holdout_ratio: 0.1
-  min_likes_user: 700
-  min_likes_anime: 100
+  min_likes_user: 100
+  min_likes_anime: 50
 
 paths:
   model_path: "rbm_best_model.pth"
