@@ -17,4 +17,4 @@ def load_anime_dataset():
     ratings = pd.read_csv(rating_path)
     anime = pd.read_csv(anime_path)
 
-    return ratings, anime
+    return filter_hentai(ratings, anime)
