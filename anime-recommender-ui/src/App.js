@@ -6,6 +6,8 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedAnime, setSelectedAnime] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [expandedRecommendations, setExpandedRecommendations] = useState(new Set());
+
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -21,12 +23,13 @@ function App() {
     }
   };
 
-  const handleClick = (animeName) => {
-    setSelectedAnime((prev) =>
-      prev.includes(animeName)
-        ? prev.filter((name) => name !== animeName)
-        : [...prev, animeName]
-    );
+  const handleClick = (anime) => {
+    setSelectedAnime((prev) => {
+      const exists = prev.some((a) => a.name === anime.name);
+      return exists
+        ? prev.filter((a) => a.name !== anime.name)
+        : [...prev, anime];
+    });
   };
 
   const getRecommendations = async () => {
@@ -34,7 +37,7 @@ function App() {
       const response = await fetch("http://localhost:5000/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ liked_anime: selectedAnime }),
+        body: JSON.stringify({ liked_anime: selectedAnime.map((a) => a.name) }),
       });
 
       const data = await response.json();
@@ -46,95 +49,120 @@ function App() {
 
   return (
     <div>
-      <h1 className="title">Anime Recommender</h1>
-      <h2 className="subtitle">Search and select your favorite anime</h2>
+      <div className="search-bar">
+        <input
+          className="search-input"
+          placeholder="Search your favorite anime"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
 
-      <input
-        className="text"
-        placeholder="Type anime name..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        style={{ padding: "8px", width: "250px", marginRight: "10px" }}
-      />
-      <button className="button" onClick={handleSearch}>
-        Search
-      </button>
+        <button className="button" onClick={handleSearch}>
+          Search
+        </button>
+      </div>
+      
+      <div className="recommend-button-wrapper">
+        <button
+          className="button"
+          onClick={getRecommendations}
+          disabled={selectedAnime.length === 0}
+        >
+          Get Recommendations
+        </button>
+      </div>
 
-      <ul style={{ listStyleType: "none", padding: 0, marginTop: "20px" }}>
-        {selectedAnime
-          .filter(
-            (selected) => !searchResults.some((anime) => anime.name === selected)
-          )
-          .map((name) => (
-            <li
-              key={name}
-              onClick={() => handleClick(name)}
-              className="anime-list-item selected"
-              style={{
-                cursor: "pointer",
-                padding: "10px",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                marginBottom: "10px",
-                backgroundColor: "#d1e7f0",
-              }}
-            >
-              <strong>{name}</strong>
-              <span style={{ color: "#888", marginLeft: "8px" }}>(Selected)</span>
-            </li>
-          ))}
-
-        {searchResults.map((anime) => {
-          const isSelected = selectedAnime.includes(anime.name);
-          const engName = anime["title_english"];
-          const showEng = engName && engName !== "Unknown" && engName !== anime.name;
-
-          return (
-            <li
+      <div className="card-grid">
+        {selectedAnime.map((anime) => (
+          <div
+            key={anime.name}
+            className="anime-card selected"
+            onClick={() => handleClick(anime)}
+            title={anime.name}
+          >
+            <div className="star-icon">★</div>
+            {anime.image_url && (
+              <div className="anime-thumb-wrapper">
+                <img src={anime.image_url} alt={anime.name} className="anime-thumb" />
+                <div className="overlay-title">
+                  <strong>{anime.name}</strong>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {/* Search Results */}
+        {searchResults
+          .filter((anime) => !selectedAnime.some((a) => a.name === anime.name))
+          .map((anime) => (
+            <div
               key={anime.anime_id}
-              onClick={() => handleClick(anime.name)}
-              className={`anime-list-item ${isSelected ? "selected" : ""}`}
-              style={{
-                cursor: "pointer",
-                padding: "10px",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                marginBottom: "10px",
-                backgroundColor: isSelected ? "#d1e7f0" : "#f9f9f9",
-              }}
+              className="anime-card"
+              onClick={() => handleClick(anime)}
+              title={anime.name}
             >
-              <strong>{anime.name}</strong>
-              {showEng && (
-                <span style={{ color: "#888", marginLeft: "8px" }}>
-                  ({engName})
-                </span>
+              {anime.image_url && (
+                <div className="anime-thumb-wrapper">
+                  <img src={anime.image_url} alt={anime.name} className="anime-thumb" />
+                  <div className="overlay-title">
+                    <strong>{anime.name}</strong>
+                  </div>
+                </div>
               )}
-            </li>
-          );
-        })}
-      </ul>
+            </div>
+        ))}
+      </div>
 
-      <button
-        className="button"
-        onClick={getRecommendations}
-        disabled={selectedAnime.length === 0}
-      >
-        Get Recommendations
-      </button>
 
       {recommendations.length > 0 && (
         <div className="recommendation-section">
-          <h3 className="subtitle">Recommended Anime:</h3>
-          <div className="scroll-row">
-            {recommendations.map((anime, index) => (
-              <div className="anime-card" key={index}>
-                <div className="card-title">{anime.name}</div>
-              </div>
-            ))}
+          <h3 className="subtitle">Recommended Anime</h3>
+          <div className="card-grid">
+            {recommendations.map((anime, index) => {
+              const isExpanded = expandedRecommendations.has(index);
+              return (
+                <div
+                  className={`anime-card ${isExpanded ? 'selected' : ''}`}
+                  key={index}
+                  onClick={() => {
+                    const newSet = new Set(expandedRecommendations);
+                    if (isExpanded) {
+                      newSet.delete(index);
+                    } else {
+                      newSet.add(index);
+                    }
+                    setExpandedRecommendations(newSet);
+                  }}
+                >
+                  {anime.image_url && (
+                    <img
+                      src={anime.image_url}
+                      alt={anime.name}
+                      className="anime-thumb"
+                    />
+                  )}
+
+                  <div className="overlay-title">
+                    <strong>{anime.name}</strong>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="card-info">
+                      {anime.genre.length > 0 && (
+                        <p className="genres"><strong>Genres:</strong> {anime.genre.join(", ")}</p>
+                      )}
+                      {anime.synopsis && (
+                        <p className="synopsis"><strong>Synopsis:</strong> {anime.synopsis}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
           </div>
         </div>
       )}
-
     </div>
   );
 }
