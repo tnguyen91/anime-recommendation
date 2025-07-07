@@ -4,9 +4,9 @@ import torch
 import matplotlib.pyplot as plt
 
 def filter_hentai(ratings, anime):
-    mask = ~anime.apply(lambda row: row.astype(str).str.contains('hentai', case=False, na=False)).any(axis=1)
+    mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)
     anime_clean = anime[mask]
-    ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['MAL_ID'])]
+    ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['anime_id'])]
     return ratings_clean, anime_clean
 
 def preprocess_data(ratings_df, min_likes_user=700, min_likes_anime=100):
@@ -67,8 +67,10 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device
     recommended = anime_df[anime_df['anime_id'].isin(top_anime_ids)].copy()
     recommended = recommended.set_index('anime_id').loc[top_anime_ids]
     recommended['score'] = scores[top_indices]
+    recommended = recommended.reset_index()  # bring anime_id back as column
 
-    return recommended[['name', 'score']]
+    return recommended[['anime_id', 'name', 'score']]
+  
 
 def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df,
                                  device='cpu', top_n=10, filename="recommendations.csv"):
