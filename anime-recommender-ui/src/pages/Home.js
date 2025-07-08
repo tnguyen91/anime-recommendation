@@ -59,7 +59,7 @@ function Home() {
         </button>
       </div>
 
-      {isLoading && <div className="subtitle">Loading...</div>}
+      {isLoading && <div className="Loader">Loading...</div>}
 
       <div className="card-grid">
         {selectedAnime.map((anime) => (

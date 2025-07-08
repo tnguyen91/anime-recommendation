@@ -1,38 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+:root {
+  --primary-color: #3388a4;
+  --secondary-color: #5b7ab4;
+  --text-color: #ffffff;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+  --font-family: 'Poppins', sans-serif;
+  --card-radius: 8px;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 body {
   background-image: url("../public/bg.png");
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-family);
   margin: 0;
   min-height: 100vh;
+  color: var(--text-color);
 }
 
 .search-bar,
 .recommend-button-wrapper {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 30px;
+  padding: 0 10px;
 }
 
 .search-input {
   padding: 10px;
   width: 100%;
   max-width: 500px;
-  font-size: 20px;
-  border: 1px solid #2f90b4;
+  font-size: 1.1rem;
+  border: 1px solid var(--primary-color);
   border-radius: 4px;
-  margin-right: 10px;
+  flex: 1;
 }
 
 .button {
   padding: 10px 20px;
-  font-size: 20px;
-  background-color: #3388a4;
+  font-size: 1.1rem;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover:not(:disabled) {
+  background-color: #2b6f8b;
 }
 
 .button:disabled {
@@ -46,13 +67,13 @@ body {
 
 .subtitle {
   text-align: center;
-  font-size: 24px;
-  color: #5b7ab4;
+  font-size: 1.5rem;
+  color: var(--secondary-color);
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 20px;
   padding: 20px;
 }
@@ -61,10 +82,12 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
   transition: transform 0.3s ease;
   cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .anime-card:hover {
@@ -79,7 +102,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--bg-overlay);
   z-index: 1;
   pointer-events: none;
 }
@@ -92,6 +115,7 @@ body {
   color: gold;
   font-size: 80px;
   z-index: 2;
+  text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.5);
 }
 
 .anime-thumb-wrapper {
@@ -106,17 +130,24 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .overlay-title {
   position: absolute;
   bottom: 0;
   width: 100%;
-  padding: 6px;
   background: rgba(0, 0, 0, 0.6);
   color: white;
-  font-size: 16px;
+  font-size: 1rem;
   z-index: 2;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.overlay-text {
+  display: inline-block;
+  padding: 6px 12px;
 }
 
 .card-info {
@@ -135,8 +166,8 @@ body {
   background: transparent;
   font-size: 0.85rem;
   line-height: 1.4;
-  border-radius: 8px;
-  backdrop-filter: blur(2px);
+  border-radius: var(--card-radius);
+  backdrop-filter: blur(10px);
   overflow-y: auto;
   scrollbar-width: auto;
 }
@@ -156,5 +187,12 @@ body {
 }
 
 .synopsis {
-  margin: 0;
+  margin: 0px;
+}
+
+.loader {
+  text-align: center;
+  margin: 20px 0;
+  font-size: 1.2rem;
+  color: var(--text-color);
 }

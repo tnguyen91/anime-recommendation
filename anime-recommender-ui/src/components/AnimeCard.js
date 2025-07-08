@@ -18,7 +18,9 @@ function AnimeCard({ anime, onClick, selected, expanded, expandable }) {
             loading="lazy"
           />
           <div className="overlay-title">
-            <strong>{anime.name}</strong>
+            <span className="overlay-text">
+              <strong>{anime.name}</strong>
+            </span>
           </div>
         </div>
       )}
