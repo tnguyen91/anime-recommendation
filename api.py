@@ -5,6 +5,11 @@ from src.data_loader import load_anime_dataset
 from src.utils import preprocess_data, get_recommendations, make_train_test_split
 from src.model import RBM
 import yaml
+import requests
+import time
+import json
+with open("anime_metadata.json", "r") as f:
+    anime_metadata = json.load(f)
 
 # Load config
 with open("config.yaml", "r") as f:
@@ -41,16 +46,13 @@ def recommend():
     data = request.get_json()
     liked_anime = data.get("liked_anime", [])
 
-    # Match titles to MAL_IDs
     matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
     if not matched_ids:
         return jsonify({"error": "No matching anime found"}), 400
 
-    # Convert to input vector
     input_vec = torch.FloatTensor([make_input_vector(matched_ids, anime_ids)]).to(device)
 
-    # Get recommendations
-    recommendations = get_recommendations(
+    recs = get_recommendations(
         input_vec.squeeze(0),
         rbm,
         anime_ids,
@@ -59,7 +61,38 @@ def recommend():
         device=device
     )
 
-    return jsonify({"recommendations": recommendations.to_dict(orient="records")})
+    # Add image and genre info
+    recommendations = []
+    for _, row in recs.iterrows():
+        #image_url, genre, synopsis = fetch_anime_info(row["anime_id"])
+        info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
+        image_url = info.get("image_url") if info else None
+        genre = info.get("genres", []) if info else []
+        synopsis = info.get("synopsis", "") if info else ""
+        recommendations.append({
+            "anime_id": row["anime_id"],
+            "name": row["name"],
+            "title_english": row.get("title_english", ""),
+            "image_url": image_url,
+            "genre": genre,
+            "synopsis": synopsis
+        })
+
+    return jsonify({"recommendations": recommendations})
+
+def fetch_anime_info(anime_id):
+    try:
+        res = requests.get(f"https://api.jikan.moe/v4/anime/{anime_id}")
+        res.raise_for_status()
+        data = res.json()
+        anime = data["data"]
+        image_url = anime["images"]["jpg"]["image_url"]
+        genres = [g["name"] for g in anime.get("genres", [])]
+        synopsis = anime.get("synopsis", "")
+        return image_url, genres, synopsis
+    except Exception as e:
+        print(f"Error fetching info for ID {anime_id}: {e}")
+        return None, [], ""
 
 @app.route('/search-anime', methods=['GET'])
 def search_anime():
@@ -74,11 +107,25 @@ def search_anime():
     for col in name_cols:
         mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
 
-    matches = anime_df[mask][["anime_id", "name", "title_english"] + name_cols].dropna()
+    matches = anime_df[mask][["anime_id", "name", "title_english"]].dropna()
 
-    results = matches.to_dict(orient="records")
+    results = []
+    for _, row in matches.iterrows():
+        #image_url, genre, synopsis = fetch_anime_info(row["anime_id"])
+        info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
+        image_url = info.get("image_url") if info else None
+        genre = info.get("genres", []) if info else []
+        synopsis = info.get("synopsis", "") if info else ""
+        results.append({
+            "anime_id": row["anime_id"],
+            "name": row["name"],
+            "title_english": row["title_english"],
+            "image_url": image_url,
+            "genre": genre,
+            "synopsis": synopsis
+        })
 
     return jsonify({"results": results})
-    
+
 if __name__ == "__main__":
     app.run(port=5000)
