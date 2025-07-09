@@ -28,7 +28,7 @@ def main(train_model=True,
          batch_size=32,
          learning_rate=0.001,
          k=10,
-         model_path='rbm_best_model.pth'):
+         model_path='out/rbm_best_model.pth'):
     print("Loading data...")
     ratings, anime = load_anime_dataset()
     user_anime, _ = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument('--learning-rate', type=float, default=0.001, help="Training learning rate")
     parser.add_argument('--n-hidden', type=int, default=512, help="Number of hidden units in RBM")
     parser.add_argument('--k', type=int, default=10, help="Top-K for evaluation/metrics")
-    parser.add_argument('--model-path', type=str, default='rbm_best_model.pth', help="Path to save/load RBM model")
+    parser.add_argument('--model-path', type=str, default='out/rbm_best_model.pth', help="Path to save/load RBM model")
     args = parser.parse_args()
 
     main(
@@ -94,5 +94,5 @@ if __name__ == "__main__":
         batch_size=args.batch_size if args.batch_size != 32 else model_config["batch_size"],
         learning_rate=args.learning_rate if args.learning_rate != 0.001 else model_config["learning_rate"],
         k=args.k if args.k != 10 else model_config["k"],
-        model_path=args.model_path if args.model_path != 'rbm_best_model.pth' else path_config["model_path"]
+        model_path=args.model_path if args.model_path != 'out/rbm_best_model.pth' else path_config["model_path"]
     )

@@ -3,7 +3,7 @@ import json
 import time
 from src.data_loader import load_anime_dataset
 
-OUTPUT_FILE = "anime_metadata.json"
+OUTPUT_FILE = "out/anime_metadata.json"
 DELAY = 0.5  # Delay between API calls to avoid rate limits
 
 def fetch_anime_info(anime_id):
@@ -23,7 +23,7 @@ def fetch_anime_info(anime_id):
             "synopsis": anime.get("synopsis", "")
         }
     except Exception as e:
-        print(f"❌ Failed to fetch anime_id {anime_id}: {e}")
+        print(f"Failed to fetch anime_id {anime_id}: {e}")
         return None
 
 def build_cache():
@@ -41,7 +41,7 @@ def build_cache():
     with open(OUTPUT_FILE, "w") as f:
         json.dump(cache, f, indent=2)
 
-    print(f"✅ Saved metadata cache to {OUTPUT_FILE}")
+    print(f"Saved metadata cache to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     build_cache()

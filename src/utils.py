@@ -73,7 +73,7 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device
   
 
 def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df,
-                                 device='cpu', top_n=10, filename="recommendations.csv"):
+                                 device='cpu', top_n=10, filename="out/recommendations.csv"):
     rbm.eval()
     user_ids = list(user_anime.index)
     input_tensor = torch.FloatTensor(train_df.values).to(device)
@@ -133,7 +133,7 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.title("RBM Training Metrics")
     plt.legend()
     plt.grid(True)
-    plt.savefig("training_metrics.png")
+    plt.savefig("out/training_metrics.png")
     plt.show()
 
 def interactive_recommender(user_anime, anime, rbm, device, top_n=10):
