@@ -49,8 +49,8 @@ anime-recommendation/
 ├── config.yaml
 ├── requirements.txt
 ├── Dockerfile
-├── anime_metadata.json
 ├── data/
+│   ├── anime_metadata.json
 ├── out/
 │   ├── training_metrics.png
 │   ├── recommendations.csv
