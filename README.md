@@ -1,6 +1,6 @@
 # Anime Recommendation System (RBM + PyTorch)
 
-A collaborative filtering recommendation system that uses a **Restricted Boltzmann Machine (RBM)** to suggest anime based on user preferences. The model is trained using implicit feedback (liked anime), accelerated on GPU with PyTorch.
+An anime recommendation system that uses a **Restricted Boltzmann Machine (RBM)** for collaborative filtering. The system provides personalized anime recommendations based on user preferences, and includes a web interface built with react and a rest api using flask.
 
 ---
 
@@ -12,18 +12,20 @@ A collaborative filtering recommendation system that uses a **Restricted Boltzma
 - Interactive CLI to generate top-N anime recommendations
 - Grid search tuning with logged results
 - Generates recommendation CSVs and training plots
+- Search anime
+- Get recommendations based on liked anime
 
 ---
 
 ## Dataset
 
-**Source**: [Anime Recommendation Database 2020 on Kaggle](https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020)
+**Source**: [MyAnimeList's Anime and User-Anime interactions](https://www.kaggle.com/datasets/bsurya27/myanimelists-anime-and-user-anime-interactions/data)
 
 - Converted ratings into implicit binary format (liked = rating ≥ 7)
 - Filtered out:
-  - Users with < 700 liked anime
-  - Anime with < 100 likes
-  - Hentai genre (for safety)
+  - Users with < 100 liked anime
+  - Anime with < 50 likes
+  - Hentai genre
 - Pivoted into a user-item matrix
 
 ---
@@ -40,65 +42,97 @@ A collaborative filtering recommendation system that uses a **Restricted Boltzma
 
 ```
 anime-recommendation/
-├── main.py                    
-├── tune_hyperparameters.py    
-├── config.yaml                
-├── data_analysis.ipynb        
-├── training_metrics.png       
-├── recommendations.csv        
+├── tune_hyperparameters.py
+├── data_analysis.ipynb
+├── api.py
+├── main.py
+├── config.yaml
 ├── requirements.txt
+├── Dockerfile
+├── anime_metadata.json
 ├── data/
-│   └── datasets/
+├── out/
+│   ├── training_metrics.png
+│   ├── recommendations.csv
+│   └── rbm_best_model.pth
 ├── src/
 │   ├── data_loader.py
+│   ├── evaluate.py
 │   ├── model.py
 │   ├── train.py
-│   ├── evaluate.py
 │   └── utils.py
+├── anime-recommender-ui/
+│   ├── .env
+│   ├── package.json
+│   ├── public/
+│   │   ├── index.html
+│   │   ├── favicon.ico
+│   │   └── bg.png
+│   └── src/
+│       ├── App.js
+│       ├── App.css
+│       ├── index.js
+│       ├── index.css
+│       ├── components/
+│       │   ├── SearchBar.js
+│       │   └── AnimeCard.js
+│       ├── pages/
+│       │   └── Home.js
+│       └── utils/
+│           └── api.js
+```
+---
+
+## Installation
+
+### 1. Clone the repo
+```bash
+git clone https://github.com/yourusername/anime-recommendation.git
+cd anime-recommendation
 ```
 
-## How to Run
-
-### 1. Install dependencies
+### 2. Install Python backend dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Train the model
+### 3. Install frontend dependencies
 ```bash
-python main.py --train
+cd anime-recommender-ui
+npm install
+```
+---
+
+## Running the App
+
+### Start Backend + Frontend Together
+```bash
+cd anime-recommender-ui
+npm start
 ```
 
-### 3. Launch the recommender
-```bash
-python main.py
-```
-
-### 4. Hyperparameter tuning
-```bash
-python tune_hyperparameters.py
-```
-
-Logged results saved to `tuning_results.csv`
+This will:
+- Start the Flask API at `http://localhost:5000`
+- Launch the React UI at `http://localhost:3000`
 
 ---
 
 ## Config File
 
-You can change all training settings in \`config.yaml\`:
+Training settings can be changed in `config.yaml`:
 ```yaml
 model:
   n_hidden: 1024
   learning_rate: 0.001
-  batch_size: 64
-  epochs: 20
+  batch_size: 32
+  epochs: 30
   k: 10
 data:
   holdout_ratio: 0.1
-  min_likes_user: 700
-  min_likes_anime: 100
+  min_likes_user: 100
+  min_likes_anime: 50
 paths:
-  model_path: rbm_best_model.pth
+  model_path: out/rbm_best_model.pth
 ```
 
 ---
@@ -113,10 +147,10 @@ paths:
 
 ## Evaluation Metrics
 
-| Metric     ||
-|------------|-------------------------------------------|
-| Precision@K | Fraction of recommended anime that were held-out|
-| MAP@K      | Mean average precision per user|
-| NDCG@K     | Ranking quality based on position|
+| Metric       | Description |
+|--------------|-------------|
+| **Precision@K** | Measures how many of the top K recommended anime were actually relevant (i.e., liked by the user). |
+| **MAP@K**       | Mean Average Precision at K: captures both correctness and order of recommendations. |
+| **NDCG@K**      | Normalized Discounted Cumulative Gain: gives higher weight to relevant items ranked higher. |
 
-![Training Metrics](training_metrics.png)
+![Training Metrics](out/training_metrics.png)
