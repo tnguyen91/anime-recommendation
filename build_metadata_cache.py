@@ -3,7 +3,7 @@ import json
 import time
 from src.data_loader import load_anime_dataset
 
-OUTPUT_FILE = "out/anime_metadata.json"
+OUTPUT_FILE = "data/anime_metadata.json"
 DELAY = 0.5  # Delay between API calls to avoid rate limits
 
 def fetch_anime_info(anime_id):

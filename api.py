@@ -8,7 +8,7 @@ import yaml
 import requests
 import time
 import json
-with open("out/anime_metadata.json", "r") as f:
+with open("data/anime_metadata.json", "r") as f:
     anime_metadata = json.load(f)
 
 # Load config
