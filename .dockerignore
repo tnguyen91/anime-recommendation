@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.Python
+venv/
+.git
+.gitignore
+README.md
+.vscode
+anime-recommender-ui/node_modules
+out/
+*.ipynb
