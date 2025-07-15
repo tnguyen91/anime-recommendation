@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./api.py:/app/api.py
+      - ./src:/app/src
+      - ./data:/app/data
+    networks:
+      - app-network
+
+  frontend:
+    build: ./anime-recommender-ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+    volumes:
+      - ./anime-recommender-ui:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
