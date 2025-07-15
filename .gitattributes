@@ -1,3 +1,2 @@
-*.pth filter=lfs diff=lfs merge=lfs -text
 *.csv filter=lfs diff=lfs merge=lfs -text
 anime_metadata.json filter=lfs diff=lfs merge=lfs -text
