@@ -9,7 +9,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "concurrently \"npm run start-react\" \"npm run start-api\"",
+	"start": "react-scripts start",
     "start-react": "react-scripts start",
     "start-api": "cd .. && python api.py"
   },
