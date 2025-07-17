@@ -72,7 +72,11 @@ def train_rbm(rbm, train_tensor, test_tensor,
 
     if best_model_state is not None:
         rbm.load_state_dict(best_model_state)
-        torch.save(best_model_state, "out/rbm_best_model.pth")
+        quantized_rbm = torch.quantization.quantize_dynamic(
+            rbm, {torch.nn.Linear}, dtype=torch.qint8
+        )
+
+        torch.save(quantized_rbm.state_dict(), "out/rbm_best_model.pth")
         print(f"Best model saved with MAP@{k}: {best_map:.4f}")
 
 

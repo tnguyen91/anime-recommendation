@@ -31,6 +31,7 @@ anime_ids = list(user_anime.columns)
 
 # Load trained model
 rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
+rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
 rbm.load_state_dict(torch.load(model_path, map_location=device))
 rbm.eval()
 

@@ -66,6 +66,7 @@ def main(train_model=True,
         generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device)
     else:
         if os.path.exists(model_path):
+            rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
             rbm.load_state_dict(torch.load(model_path, map_location=device))
             print(f"Loaded trained RBM from {model_path}")
         else:
