@@ -11,7 +11,8 @@
   "scripts": {
 	"start": "react-scripts start",
     "start-react": "react-scripts start",
-    "start-api": "cd .. && python api.py"
+    "start-api": "cd .. && python api.py",
+	"build": "react-scripts build"
   },
   "browserslist": {
     "production": [
