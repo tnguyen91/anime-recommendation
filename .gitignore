@@ -1,7 +1,27 @@
-.vscode/
-venv
+# Python
 __pycache__/
-*.ipynb_checkpoints/
 *.pyc
-datasets/
+*.pyo
+*.pyd
+env/
+venv/
+out/
+data/
+*.pth
 *.csv
+*.json
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (Frontend)
+anime-recommender-ui/node_modules/
+anime-recommender-ui/.env
