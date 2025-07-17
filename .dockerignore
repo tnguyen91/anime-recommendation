@@ -7,5 +7,4 @@ venv/
 README.md
 .vscode
 anime-recommender-ui/node_modules
-out/
 *.ipynb
