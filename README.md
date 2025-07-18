@@ -6,14 +6,24 @@ An anime recommendation system that uses a **Restricted Boltzmann Machine (RBM)*
 
 ## Features
 
-- RBM-based collaborative filtering model
+- RBM-based collaborative filtering model (PyTorch)
 - CUDA GPU acceleration (auto-detected)
-- Precision@K, MAP@K, and NDCG@K for evaluation
-- Interactive CLI to generate top-N anime recommendations
-- Grid search tuning with logged results
-- Generates recommendation CSVs and training plots
-- Search anime
-- Get recommendations based on liked anime
+- Precision@K, MAP@K, and NDCG@K evaluation
+- Interactive CLI to generate top-N recommendations
+- REST API (Flask, served via Gunicorn in production) for backend services
+- Production-ready Docker & Docker Compose setup
+- React web UI for searching and getting recommendations
+- Grid search for hyperparameter tuning with CSV logs
+- Outputs recommendation CSVs and training plots
+
+---
+
+## Tech Stack
+
+- **Backend:** Python, Flask, PyTorch, Gunicorn, RBM
+- **Frontend:** React, JavaScript, Nginx (Dockerized)
+- **Deployment:** Docker, Docker Compose
+- **Other:** pandas, numpy, seaborn, flask-cors
 
 ---
 
@@ -42,16 +52,23 @@ An anime recommendation system that uses a **Restricted Boltzmann Machine (RBM)*
 
 ```
 anime-recommendation/
-├── tune_hyperparameters.py
+├── .dockerignore
+├── .gitignore
+├── hyperparameter_tuning.py
 ├── data_analysis.ipynb
 ├── api.py
 ├── main.py
+├── build_metadata_cache.py
 ├── config.yaml
 ├── requirements.txt
 ├── Dockerfile
+├── docker-compose.yml
+├── README.md
 ├── data/
+│   ├── datasets/
 │   ├── anime_metadata.json
 ├── out/
+│   ├── tuning_results.csv
 │   ├── training_metrics.png
 │   ├── recommendations.csv
 │   └── rbm_best_model.pth
@@ -63,7 +80,10 @@ anime-recommendation/
 │   └── utils.py
 ├── anime-recommender-ui/
 │   ├── .env
+│   ├── Dockerfile
+│   ├── .dockerignore
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── public/
 │   │   ├── index.html
 │   │   ├── favicon.ico
@@ -81,6 +101,7 @@ anime-recommendation/
 │       └── utils/
 │           └── api.js
 ```
+
 ---
 
 ## Installation
@@ -90,30 +111,56 @@ anime-recommendation/
 git clone https://github.com/yourusername/anime-recommendation.git
 cd anime-recommendation
 ```
-
-### 2. Install Python backend dependencies
+### 2. Set up a virtual environment
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+### 3. Install Python backend dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Install frontend dependencies
+### 4. Install frontend dependencies
 ```bash
 cd anime-recommender-ui
 npm install
 ```
+### 5. (Optional) Train the model
+```bash
+python main.py --train
+```
+### 6. (Optional) Hyperparameter tuning
+```bash
+python hyperparameters_tuning.py
+```
+
 ---
 
-## Running the App
+## Quickstart (with Docker)
 
-### Start Backend + Frontend Together
+You can run the backend (Flask API) and frontend (React UI) together using Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+  - Frontend: http://localhost
+  - API: http://localhost:5000
+
+---
+
+## Running Locally
+
+### Start backend (Flask API):
+```bash
+python api.py
+```
+### Start frontend (React UI) in a new terminal:
 ```bash
 cd anime-recommender-ui
 npm start
 ```
-
-This will:
-- Start the Flask API at `http://localhost:5000`
-- Launch the React UI at `http://localhost:3000`
 
 ---
 
@@ -133,6 +180,21 @@ data:
   min_likes_anime: 50
 paths:
   model_path: out/rbm_best_model.pth
+```
+---
+
+## Environment Variables
+The frontend expects a `.env` file in `anime-recommender-ui/`.
+
+To use:
+1. Copy .env.example to .env in anime-recommender-ui/.
+2. Adjust the value if running locally
+```bash
+REACT_APP_API_URL=http://backend:5000    # for Docker Compose
+```
+or
+```bash
+REACT_APP_API_URL=http://localhost:5000  # for local development
 ```
 
 ---
