@@ -139,7 +139,7 @@ python hyperparameters_tuning.py
 
 ## Quickstart (with Docker)
 
-You can run the backend (Flask API) and frontend (React UI) together using Docker Compose:
+Run backend (Flask API) and frontend (React UI) together using Docker Compose:
 
 ```bash
 docker-compose up --build
@@ -184,18 +184,29 @@ paths:
 ---
 
 ## Environment Variables
-The frontend expects a `.env` file in `anime-recommender-ui/`.
 
-To use:
-1. Copy .env.example to .env in anime-recommender-ui/.
-2. Adjust the value if running locally
-```bash
-REACT_APP_API_URL=http://backend:5000    # for Docker Compose
-```
-or
-```bash
-REACT_APP_API_URL=http://localhost:5000  # for local development
-```
+The frontend expects a `.env` file in the `anime-recommender-ui/` directory.
+
+1. Go to the frontend directory:
+    ```bash
+    cd anime-recommender-ui/
+    ```
+
+2. Copy the example environment file:
+    ```bash
+    cp .env.example .env
+    ```
+
+3. Edit `.env` and set the API URL as needed:
+
+    - For Docker Compose:
+      ```env
+      REACT_APP_API_URL=http://backend:5000
+      ```
+    - For local development:
+      ```env
+      REACT_APP_API_URL=http://localhost:5000
+      ```
 
 ---
 
