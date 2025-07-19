@@ -16,4 +16,3 @@ class BaseRecommender(ABC):
     @abstractmethod
     def load(self, path):
         pass
-

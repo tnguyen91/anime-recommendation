@@ -31,26 +31,33 @@ def main(model_type='rbm',
          model_path='out/rbm_best_model.pth'):
     print("Loading data...")
     ratings, anime = load_anime_dataset()
-    user_anime, _ = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
+    user_anime, ratings = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
     print("user_anime shape:", user_anime.shape)
     print("ratings shape:", ratings.shape)
-
-    print("Creating train-test split...")
-    train, test = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
-    held_out_counts = test.sum(axis=1)
-    print("Test split stats:\n", pd.Series(held_out_counts).describe())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    train_tensor = torch.FloatTensor(train.values).to(device)
-    test_tensor = torch.FloatTensor(test).to(device)
+    if model_type == 'rbm':
+        print("creating train-test split...")
+        train, test = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
+        held_out_counts = test.sum(axis=1)
+        print("Test split stats:\n", pd.Series(held_out_counts).describe())
 
-    model_params = {
-        "n_visible": train_tensor.shape[1],
-        "n_hidden": n_hidden
-    }
+        train_tensor = torch.FloatTensor(train.values).to(device)
+        test_tensor = torch.FloatTensor(test).to(device)
 
+        model_params = {
+            "n_visible": train_tensor.shape[1],
+            "n_hidden": n_hidden
+        }
+    elif model_type == 'ncf':
+        train, test = make_train_test_split(ratings, holdout_ratio=data_config["holdout_ratio"])
+
+
+
+
+        
     model = get_model(model_type, **model_params).to(device)
     
     if train_model:
