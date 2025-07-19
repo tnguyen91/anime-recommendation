@@ -1,9 +1,10 @@
-model:
-  n_hidden: 1024
-  learning_rate: 0.001
-  batch_size: 32
-  epochs: 30
-  k: 10
+models:
+  - type: "rbm"
+    n_hidden: 1024
+    learning_rate: 0.001
+    batch_size: 32
+    epochs: 30
+    k: 10
 
 data:
   holdout_ratio: 0.1

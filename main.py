@@ -1,7 +1,6 @@
 from src.data_loader import load_anime_dataset
 from src.utils import preprocess_data, make_train_test_split, generate_recommendations_csv, plot_training_metrics, interactive_recommender
-from src.model import RBM
-from src.train import train_rbm
+from src.model_factory import get_model
 import torch
 import numpy as np
 import pandas as pd
@@ -21,7 +20,8 @@ SEED = 1234
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
-def main(train_model=True,
+def main(model_type='rbm',
+         train_model=True,
          run_cli=True,
          n_hidden=512,
          epochs=20,
@@ -46,37 +46,37 @@ def main(train_model=True,
     train_tensor = torch.FloatTensor(train.values).to(device)
     test_tensor = torch.FloatTensor(test).to(device)
 
-    rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
+    model_params = {
+        "n_visible": train_tensor.shape[1],
+        "n_hidden": n_hidden
+    }
 
+    model = get_model(model_type, **model_params).to(device)
+    
     if train_model:
         if torch.cuda.is_available():
             print(torch.cuda.get_device_name(0))
-            print(f"Memory Allocated: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
-            print(f"Memory Cached: {torch.cuda.memory_reserved() / 1024**2:.1f} MB")
         print(f"Training hyperparameter: \nepochs-{epochs}    batch_size-{batch_size}    learning_rate-{learning_rate}   n_hidden-{n_hidden}")
-        rbm, losses, precs, maps, ndcgs = train_rbm(
-            rbm, train_tensor, test_tensor,
+        results =  model.fit(
+            train_tensor,
+            test_tensor,
             epochs=epochs,
             batch_size=batch_size,
             learning_rate=learning_rate,
             k=k,
             device=device
-        )
-        plot_training_metrics(losses, precs, maps, ndcgs, k)
-        generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device)
+        ) 
+        plot_training_metrics(results['losses'], results['precs'], results['maps'], results['ndcgs'], k)
+        generate_recommendations_csv(model, train, test, user_anime, anime, device=device)
+        model.save(model_path)
     else:
-        if os.path.exists(model_path):
-            rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
-            rbm.load_state_dict(torch.load(model_path, map_location=device))
-            print(f"Loaded trained RBM from {model_path}")
-        else:
-            print(f"Trained model '{model_path}' not found. Please train first or specify the correct path.")
-            return
+        model.load(model_path, device=device)
     if run_cli:
-        interactive_recommender(user_anime, anime, rbm, device, top_n=10)
+        interactive_recommender(user_anime, anime, model, device, top_n=10)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Anime Recommendation System (RBM)")
+    parser.add_argument('--model', type=str, default='rbm', help="Model type to use (e.g., rbm)");
     parser.add_argument('--train', action='store_true', help="Train the RBM model")
     parser.add_argument('--no-cli', action='store_true', help="Do not launch the interactive CLI recommender")
     parser.add_argument('--epochs', type=int, default=20, help="Number of training epochs")
@@ -88,6 +88,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(
+        model_type=args.model if args.model != 'rbm' else model_config.get("type", "rbm"),
         train_model=args.train,
         run_cli=not args.no_cli,
         n_hidden=args.n_hidden if args.n_hidden != 512 else model_config["n_hidden"],

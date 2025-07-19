@@ -1,12 +1,11 @@
 import torch
 
-def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
-    rbm.eval()
+def evaluate_at_k(model, train_tensor, test_tensor, k=10, device='cpu'):
+    model.eval()
     train_tensor = train_tensor.to(device)
     test_tensor = test_tensor.to(device)
     with torch.no_grad():
-        p_h, _ = rbm.sample_h(train_tensor)
-        p_v, _ = rbm.sample_v(p_h)
+        scores = model.predict(train_tensor, device=device)
 
     num_users, num_items = train_tensor.shape
     precisions = []
@@ -21,7 +20,7 @@ def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
         if held_out.numel() == 0:
             continue
 
-        user_scores = p_v[user].clone()
+        user_scores = scores[user].clone()
         user_scores[train_row == 1] = -1e6  # mask out already-liked
 
         topk = torch.topk(user_scores, k=k).indices
