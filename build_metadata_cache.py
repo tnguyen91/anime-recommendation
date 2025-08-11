@@ -3,10 +3,11 @@ import time
 
 import requests
 
+from constants import ANIME_METADATA_FILE, API_DELAY_SECONDS
 from src.data_loader import load_anime_dataset
 
-OUTPUT_FILE = "data/anime_metadata.json"
-DELAY = 0.5  # Delay between API calls to avoid rate limits
+OUTPUT_FILE = ANIME_METADATA_FILE
+DELAY = API_DELAY_SECONDS  # Delay between API calls to avoid rate limits
 
 def fetch_anime_info(anime_id):
     try:

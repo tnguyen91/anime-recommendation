@@ -7,21 +7,23 @@ import yaml
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+from constants import (
+    DEFAULT_TOP_N, DEFAULT_API_HOST, DEFAULT_API_PORT,
+    HTTP_BAD_REQUEST, ANIME_METADATA_FILE, CONFIG_FILE
+)
 from src.data_loader import load_anime_dataset
 from src.model import RBM
 from src.utils import preprocess_data, get_recommendations, make_train_test_split
-with open("data/anime_metadata.json", "r") as f:
+
+with open(ANIME_METADATA_FILE, "r") as f:
     anime_metadata = json.load(f)
 
-# Load config
-with open("config.yaml", "r") as f:
+with open(CONFIG_FILE, "r") as f:
     config = yaml.safe_load(f)
 
-# Settings
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = config["paths"]["model_path"]
 
-# Load dataset
 ratings, anime_df = load_anime_dataset()
 user_anime, _ = preprocess_data(
     ratings,
@@ -31,7 +33,6 @@ user_anime, _ = preprocess_data(
 
 anime_ids = list(user_anime.columns)
 
-# Load trained model
 rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
 rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
 rbm.load_state_dict(torch.load(model_path, map_location=device))
@@ -51,7 +52,7 @@ def recommend():
 
     matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
     if not matched_ids:
-        return jsonify({"error": "No matching anime found"}), 400
+        return jsonify({"error": "No matching anime found"}), HTTP_BAD_REQUEST
 
     input_vec = torch.FloatTensor([make_input_vector(matched_ids, anime_ids)]).to(device)
 
@@ -60,14 +61,13 @@ def recommend():
         rbm,
         anime_ids,
         anime_df,
-        top_n=10,
+        top_n=DEFAULT_TOP_N,
         device=device
     )
 
     # Add image and genre info
     recommendations = []
     for _, row in recs.iterrows():
-        #image_url, genre, synopsis = fetch_anime_info(row["anime_id"])
         info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
         image_url = info.get("image_url") if info else None
         genre = info.get("genres", []) if info else []
@@ -114,7 +114,6 @@ def search_anime():
 
     results = []
     for _, row in matches.iterrows():
-        #image_url, genre, synopsis = fetch_anime_info(row["anime_id"])
         info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
         image_url = info.get("image_url") if info else None
         genre = info.get("genres", []) if info else []
@@ -131,4 +130,4 @@ def search_anime():
     return jsonify({"results": results})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host=DEFAULT_API_HOST, port=DEFAULT_API_PORT, debug=True)

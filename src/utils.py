@@ -3,16 +3,21 @@ import numpy as np
 import pandas as pd
 import torch
 
+from constants import (
+    DEFAULT_SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
+    DEFAULT_FIGURE_SIZE
+)
+
 def filter_hentai(ratings, anime):
     mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)
     anime_clean = anime[mask]
     ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['anime_id'])]
     return ratings_clean, anime_clean
 
-def preprocess_data(ratings_df, min_likes_user=700, min_likes_anime=100):
+def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
     ratings_df = ratings_df.copy()
     ratings_df = ratings_df[ratings_df['status'] == 'Completed']
-    ratings_df['liked'] = (ratings_df['score'] >= 7).astype(int)
+    ratings_df['liked'] = (ratings_df['score'] >= RATING_THRESHOLD).astype(int)
 
     anime_likes = ratings_df.groupby('anime_id')['liked'].sum()
     active_anime = anime_likes[anime_likes >= min_likes_anime].index
@@ -31,7 +36,7 @@ def preprocess_data(ratings_df, min_likes_user=700, min_likes_anime=100):
 
     return user_anime, ratings_df
 
-def make_train_test_split(data, holdout_ratio=0.1, seed=1234):
+def make_train_test_split(data, holdout_ratio=0.1, seed=DEFAULT_SEED):
     np.random.seed(seed)
     train = data.copy()
     test = np.zeros(data.shape)
@@ -45,7 +50,7 @@ def make_train_test_split(data, holdout_ratio=0.1, seed=1234):
             test[user, test_idx] = 1
     return train, test
 
-def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device='cpu'):
+def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=DEFAULT_TOP_N, device='cpu'):
     rbm.eval()
 
     if isinstance(input_vector, (list, np.ndarray)):
@@ -72,11 +77,11 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device
     return recommended[['anime_id', 'name', 'score']]
   
 
-def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df,
-                                 device='cpu', top_n=10, filename="out/recommendations.csv"):
+def generate_recommendations_csv(rbm, train, test, user_anime, anime,
+                                 device='cpu', top_n=DEFAULT_TOP_N, filename="out/recommendations.csv"):
     rbm.eval()
     user_ids = list(user_anime.index)
-    input_tensor = torch.FloatTensor(train_df.values).to(device)
+    input_tensor = torch.FloatTensor(train.values).to(device)
 
     with torch.no_grad():
         p_h, _ = rbm.sample_h(input_tensor)
@@ -92,7 +97,7 @@ def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df
         top_indices = user_scores.argsort()[::-1][:top_n]
         top_anime_ids = [anime_ids[j] for j in top_indices]
 
-        held_out_vector = test_array[i].astype(int)
+        held_out_vector = test[i].astype(int)
         held_out_indices = np.where(held_out_vector == 1)[0]
         held_out_ids = [anime_ids[j] for j in held_out_indices]
 
@@ -100,8 +105,8 @@ def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df
             recommendation_rows.append({
                 'user_id': user_id,
                 'anime_id': anime_id,
-                'anime_name': anime_df.loc[anime_df['anime_id'] == anime_id, 'name'].values[0]
-                              if anime_id in anime_df['anime_id'].values else 'Unknown',
+                'anime_name': anime.loc[anime['anime_id'] == anime_id, 'name'].values[0]
+                              if anime_id in anime['anime_id'].values else 'Unknown',
                 'predicted_score': user_scores[j],
                 'is_held_out': anime_id in held_out_ids
             })
@@ -123,7 +128,7 @@ def make_input_vector(liked_anime_ids, anime_ids):
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def plot_training_metrics(losses, precs, maps, ndcgs, K):
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=DEFAULT_FIGURE_SIZE)
     plt.plot(losses, label="Loss")
     plt.plot(precs, label=f"Precision@{K}")
     plt.plot(maps, label=f"MAP@{K}")
@@ -136,7 +141,7 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.savefig("out/training_metrics.png")
     plt.show()
 
-def interactive_recommender(user_anime, anime, rbm, device, top_n=10):
+def interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N):
     anime_ids = list(user_anime.columns)
     liked_anime_ids = []
 

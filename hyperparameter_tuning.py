@@ -7,28 +7,28 @@ import numpy as np
 import torch
 import yaml
 
+from constants import (
+    HYPERPARAMETER_SEED, HYPERPARAMETER_GRID, HYPERPARAMETER_EPOCHS,
+    DEFAULT_K, CONFIG_FILE
+)
 from src.data_loader import load_anime_dataset
 from src.model import RBM
 from src.train import train_rbm
 from src.utils import preprocess_data, make_train_test_split
 
-seed = 42
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
+random.seed(HYPERPARAMETER_SEED)
+np.random.seed(HYPERPARAMETER_SEED)
+torch.manual_seed(HYPERPARAMETER_SEED)
+torch.cuda.manual_seed_all(HYPERPARAMETER_SEED)
 
-with open("config.yaml", "r") as f:
+with open(CONFIG_FILE, "r") as f:
     config = yaml.safe_load(f)
 
 data_config = config["data"]
 path_config = config["paths"]
 
-param_grid = {
-    "n_hidden": [512, 1024],
-    "learning_rate": [0.01, 0.001, 0.0001],
-    "batch_size": [16, 32, 64],
-}
+# Grid search parameters
+param_grid = HYPERPARAMETER_GRID
 
 # Load data
 ratings, anime = load_anime_dataset()
@@ -48,16 +48,14 @@ for combo in itertools.product(*param_grid.values()):
     print(f"\nTesting: n_hidden={n_hidden}, lr={learning_rate}, batch_size={batch_size}")
 
     rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
-    rbm, _, precisions, maps, ndcgs = train_rbm(
-        rbm,
-        train_tensor.to(device),
-        test_tensor.to(device),
-        epochs=30,
-        batch_size=batch_size,
-        learning_rate=learning_rate,
-        k=10,
-        device=device,
-    )
+    rbm, losses, precs, maps, ndcgs = train_rbm(
+            rbm, train_tensor, test_tensor,
+            epochs=HYPERPARAMETER_EPOCHS,
+            batch_size=params["batch_size"],
+            learning_rate=params["learning_rate"],
+            k=DEFAULT_K,
+            device=device
+        )
 
     final_precision = precisions[-1]
     final_ndcg = ndcgs[-1]

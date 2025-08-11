@@ -1,19 +1,24 @@
 import torch
 
+from constants import (
+    DEFAULT_EPOCHS, DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K,
+    WEIGHT_DECAY, CLAMP_MIN, CLAMP_MAX, EARLY_STOPPING_PATIENCE
+)
 from src.evaluate import evaluate_at_k
 
 def train_rbm(rbm, train_tensor, test_tensor, 
-              epochs=20, batch_size=32, learning_rate=0.001, k=10, device='cpu'):
+              epochs=DEFAULT_EPOCHS, batch_size=DEFAULT_BATCH_SIZE, 
+              learning_rate=DEFAULT_LEARNING_RATE, k=DEFAULT_K, device='cpu'):
     rbm.to(device)
     train_tensor = train_tensor.to(device)
     test_tensor = test_tensor.to(device)
 
-    optimizer = torch.optim.Adam(rbm.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(rbm.parameters(), lr=learning_rate, weight_decay=WEIGHT_DECAY)
 
     losses, precs, maps, ndcgs = [], [], [], []
 
     best_map = 0.0
-    patience = 3
+    patience = EARLY_STOPPING_PATIENCE
     patience_counter = 0
     best_model_state = None
 
@@ -27,7 +32,7 @@ def train_rbm(rbm, train_tensor, test_tensor,
             ph0, _ = rbm.sample_h(v0)
             _, vk = rbm.sample_v(ph0)
             phk, _ = rbm.sample_h(vk)
-            vk = torch.clamp(vk, 0.0, 1.0)
+            vk = torch.clamp(vk, CLAMP_MIN, CLAMP_MAX)
 
             positive_grad = torch.bmm(ph0.unsqueeze(2), v0.unsqueeze(1))
             negative_grad = torch.bmm(phk.unsqueeze(2), vk.unsqueeze(1))
