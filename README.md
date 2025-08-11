@@ -1,52 +1,57 @@
-# Anime Recommendation System (RBM + PyTorch)
+# Anime Recommendation System using Restricted Boltzmann Machines
 
-An anime recommendation system that uses a **Restricted Boltzmann Machine (RBM)** for collaborative filtering. The system provides personalized anime recommendations based on user preferences, and includes a web interface built with react and a rest api using flask.
+A machine learning-based anime recommendation system that leverages **Restricted Boltzmann Machines (RBM)** for collaborative filtering. The system provides personalized anime recommendations and includes a full-stack web application with React frontend and Flask API backend.
 
----
+## 🚀 Features
 
-## Features
+- **Machine Learning**: RBM-based collaborative filtering model implemented with PyTorch
+- **GPU Acceleration**: Automatic CUDA detection and utilization for training
+- **Comprehensive Evaluation**: Precision@K, MAP@K, and NDCG@K metrics
+- **Web Interface**: Modern React frontend with search and recommendation features
+- **REST API**: Flask backend with comprehensive error handling and validation
+- **Production Ready**: Docker containerization and Docker Compose orchestration
+- **Hyperparameter Tuning**: Automated grid search with CSV result logging
+- **Data Visualization**: Training metrics plots and recommendation exports
 
-- RBM-based collaborative filtering model (PyTorch)
-- CUDA GPU acceleration (auto-detected)
-- Precision@K, MAP@K, and NDCG@K evaluation
-- Interactive CLI to generate top-N recommendations
-- REST API (Flask, served via Gunicorn in production) for backend services
-- Production-ready Docker & Docker Compose setup
-- React web UI for searching and getting recommendations
-- Grid search for hyperparameter tuning with CSV logs
-- Outputs recommendation CSVs and training plots
+## 🛠️ Technology Stack
 
----
+**Backend & ML:**
+- Python 3.12
+- PyTorch (RBM implementation)
+- Flask (REST API)
+- pandas, NumPy (data processing)
+- Gunicorn (production WSGI server)
 
-## Tech Stack
+**Frontend:**
+- React 18
+- Modern JavaScript (ES6+)
+- CSS3 with custom styling
 
-- **Backend:** Python, Flask, PyTorch, Gunicorn, RBM
-- **Frontend:** React, JavaScript, Nginx (Dockerized)
-- **Deployment:** Docker, Docker Compose
-- **Other:** pandas, numpy, seaborn, flask-cors
+**DevOps & Deployment:**
+- Docker & Docker Compose
+- Nginx (reverse proxy)
+- Automated dataset downloading via KaggleHub
 
----
+## 📊 Dataset & Preprocessing
 
-## Dataset
+**Source**: [MyAnimeList Anime and User Interactions](https://www.kaggle.com/datasets/bsurya27/myanimelists-anime-and-user-anime-interactions)
 
-**Source**: [MyAnimeList's Anime and User-Anime interactions](https://www.kaggle.com/datasets/bsurya27/myanimelists-anime-and-user-anime-interactions/data)
+**Data Pipeline:**
+- Raw ratings converted to binary implicit feedback (liked = rating ≥ 7)
+- Quality filters applied:
+  - Users: minimum 100 liked anime
+  - Anime: minimum 50 total likes
+  - Content filtering: adult/hentai genres removed
+- Final format: sparse user-item interaction matrix
 
-- Converted ratings into implicit binary format (liked = rating ≥ 7)
-- Filtered out:
-  - Users with < 100 liked anime
-  - Anime with < 50 likes
-  - Hentai genre
-- Pivoted into a user-item matrix
+## 🧠 Machine Learning Model
 
----
-
-## Model: Restricted Boltzmann Machine (RBM)
-
-- Binary input vector: whether a user liked an anime
-- Learns hidden representations and reconstructs unseen preferences
-- Evaluated using ranking metrics over held-out anime
-
----
+**Restricted Boltzmann Machine (RBM):**
+- **Input**: Binary user-item preference vectors
+- **Architecture**: Visible units (anime) ↔ Hidden units (latent factors)
+- **Training**: Contrastive Divergence with Adam optimizer
+- **Evaluation**: Top-K ranking metrics on held-out interactions
+- **Features**: Early stopping, model quantization, GPU acceleration
 
 ## Project Structure
 

@@ -1,3 +1,15 @@
+#!/usr/bin/env python3
+"""
+Anime Recommendation System - REST API Server
+
+Flask-based REST API that serves anime recommendations using a trained RBM model.
+Provides endpoints for searching anime and generating personalized recommendations.
+
+Endpoints:
+    POST /recommend        - Generate recommendations from liked anime
+    GET  /search-anime     - Search anime database by name
+"""
+
 import json
 import os
 import time

@@ -1,3 +1,15 @@
+"""
+Anime Recommendation System - Main Training Script
+
+A machine learning project that uses Restricted Boltzmann Machines (RBM) 
+for collaborative filtering to generate personalized anime recommendations.
+
+Usage:
+    python main.py --train          # Train new model
+    python main.py --recommend      # Interactive recommendations
+    python main.py --help           # Show help
+"""
+
 import argparse
 import os
 

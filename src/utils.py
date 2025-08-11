@@ -2,13 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from typing import List, Tuple, Optional
 
 from constants import (
     DEFAULT_SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
     DEFAULT_FIGURE_SIZE
 )
 
-def filter_hentai(ratings, anime):
+def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Filter out adult/hentai content from anime datasets.
     

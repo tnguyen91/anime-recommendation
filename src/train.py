@@ -1,9 +1,13 @@
 import torch
 
+import torch
+from typing import Tuple, Optional, List
+
+from constants import CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE
 from constants import (
-    DEFAULT_EPOCHS, DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K,
-    WEIGHT_DECAY, CLAMP_MIN, CLAMP_MAX, EARLY_STOPPING_PATIENCE
+    DEFAULT_EPOCHS, DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
 )
+from src.evaluate import evaluate_at_k
 from src.evaluate import evaluate_at_k
 
 def train_single_batch(rbm, optimizer, batch):

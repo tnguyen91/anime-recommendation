@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from typing import Tuple
 
 class RBM(nn.Module):
     """
@@ -23,9 +24,12 @@ class RBM(nn.Module):
         self.v_bias = nn.Parameter(torch.zeros(n_visible))
         self.h_bias = nn.Parameter(torch.zeros(n_hidden))
 
-    def sample_h(self, v):
+    def sample_h(self, v: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Sample hidden units given visible units.
+        Sample hidden layer activations given visible layer input.
+        
+        Backward pass from visible to hidden layer using sigmoid activation.
+        Used in the positive and negative phases of contrastive divergence.
         
         Args:
             v (torch.Tensor): Visible unit activations (batch_size, n_visible)
@@ -36,9 +40,12 @@ class RBM(nn.Module):
         p_h = torch.sigmoid(torch.mm(v, self.W.t()) + self.h_bias)
         return p_h, torch.bernoulli(p_h)
 
-    def sample_v(self, h):
+    def sample_v(self, h: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Sample visible units given hidden units.
+        
+        Forward pass from hidden to visible layer using sigmoid activation.
+        Used in the negative phase of contrastive divergence training.
         
         Args:
             h (torch.Tensor): Hidden unit activations (batch_size, n_hidden)
