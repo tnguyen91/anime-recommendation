@@ -1,34 +1,34 @@
-import itertools
-import torch
-from src.data_loader import load_anime_dataset
-from src.utils import preprocess_data, make_train_test_split
-from src.model import RBM
-from src.train import train_rbm
 import csv
+import itertools
 import os
 import random
+
 import numpy as np
+import torch
 import yaml
 
-seed = 42
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
+from constants import (
+    HYPERPARAMETER_SEED, HYPERPARAMETER_GRID, HYPERPARAMETER_EPOCHS,
+    DEFAULT_K, CONFIG_FILE
+)
+from src.data_loader import load_anime_dataset
+from src.model import RBM
+from src.train import train_rbm
+from src.utils import preprocess_data, make_train_test_split
 
-with open("config.yaml", "r") as f:
+random.seed(HYPERPARAMETER_SEED)
+np.random.seed(HYPERPARAMETER_SEED)
+torch.manual_seed(HYPERPARAMETER_SEED)
+torch.cuda.manual_seed_all(HYPERPARAMETER_SEED)
+
+with open(CONFIG_FILE, "r") as f:
     config = yaml.safe_load(f)
 
 data_config = config["data"]
 path_config = config["paths"]
 
-param_grid = {
-    "n_hidden": [512, 1024],
-    "learning_rate": [0.01, 0.001, 0.0001],
-    "batch_size": [16, 32, 64],
-}
+param_grid = HYPERPARAMETER_GRID
 
-# Load data
 ratings, anime = load_anime_dataset()
 user_anime, _ = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
 train_df, test_array = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
@@ -46,18 +46,16 @@ for combo in itertools.product(*param_grid.values()):
     print(f"\nTesting: n_hidden={n_hidden}, lr={learning_rate}, batch_size={batch_size}")
 
     rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
-    rbm, _, precisions, maps, ndcgs = train_rbm(
-        rbm,
-        train_tensor.to(device),
-        test_tensor.to(device),
-        epochs=30,
-        batch_size=batch_size,
-        learning_rate=learning_rate,
-        k=10,
-        device=device,
-    )
+    rbm, losses, precs, maps, ndcgs = train_rbm(
+            rbm, train_tensor, test_tensor,
+            epochs=HYPERPARAMETER_EPOCHS,
+            batch_size=param_grid["batch_size"],
+            learning_rate=param_grid["learning_rate"],
+            k=DEFAULT_K,
+            device=device
+        )
 
-    final_precision = precisions[-1]
+    final_precision = precs[-1]
     final_ndcg = ndcgs[-1]
     final_map = maps[-1]
 

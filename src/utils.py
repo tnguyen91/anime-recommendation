@@ -1,18 +1,58 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import matplotlib.pyplot as plt
+from typing import List, Tuple, Optional
 
-def filter_hentai(ratings, anime):
+from constants import (
+    DEFAULT_SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
+    DEFAULT_FIGURE_SIZE
+)
+
+def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Filter out adult/hentai content from anime datasets.
+    
+    Removes anime entries and corresponding ratings that contain 'Hentai'
+    in any of their metadata fields to create a cleaner dataset suitable
+    for general recommendation purposes.
+    
+    Args:
+        ratings (pd.DataFrame): User ratings dataframe with 'anime_id' column
+        anime (pd.DataFrame): Anime metadata dataframe with 'anime_id' column
+        
+    Returns:
+        tuple: (ratings_clean, anime_clean)
+            - ratings_clean: Filtered ratings dataframe
+            - anime_clean: Filtered anime metadata dataframe
+    """
     mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)
     anime_clean = anime[mask]
     ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['anime_id'])]
     return ratings_clean, anime_clean
 
-def preprocess_data(ratings_df, min_likes_user=700, min_likes_anime=100):
+def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
+    """
+    Preprocess ratings data for collaborative filtering.
+    
+    Converts ratings to binary likes/dislikes, filters out inactive users and
+    unpopular anime, and creates a user-item interaction matrix. Only considers
+    completed anime ratings and applies minimum interaction thresholds.
+    
+    Args:
+        ratings_df (pd.DataFrame): Raw ratings data with columns:
+            ['user_id', 'anime_id', 'score', 'status']
+        min_likes_user (int, optional): Minimum likes per user. Defaults to 100.
+        min_likes_anime (int, optional): Minimum likes per anime. Defaults to 50.
+        
+    Returns:
+        tuple: (user_anime, ratings_df)
+            - user_anime: Binary user-item interaction matrix (pivot table)
+            - ratings_df: Processed ratings dataframe with 'liked' column
+    """
     ratings_df = ratings_df.copy()
     ratings_df = ratings_df[ratings_df['status'] == 'Completed']
-    ratings_df['liked'] = (ratings_df['score'] >= 7).astype(int)
+    ratings_df['liked'] = (ratings_df['score'] >= RATING_THRESHOLD).astype(int)
 
     anime_likes = ratings_df.groupby('anime_id')['liked'].sum()
     active_anime = anime_likes[anime_likes >= min_likes_anime].index
@@ -31,7 +71,24 @@ def preprocess_data(ratings_df, min_likes_user=700, min_likes_anime=100):
 
     return user_anime, ratings_df
 
-def make_train_test_split(data, holdout_ratio=0.1, seed=1234):
+def make_train_test_split(data, holdout_ratio=0.1, seed=DEFAULT_SEED):
+    """
+    Create train/test split by randomly holding out user interactions.
+    
+    Randomly selects a fraction of positive interactions for each user
+    to use as test data, while keeping the remaining interactions for training.
+    Maintains user activity levels by only holding out from existing interactions.
+    
+    Args:
+        data (pd.DataFrame): User-item interaction matrix (users as rows, items as columns)
+        holdout_ratio (float, optional): Fraction of interactions to hold out. Defaults to 0.1.
+        seed (int, optional): Random seed for reproducibility. Defaults to DEFAULT_SEED.
+        
+    Returns:
+        tuple: (train, test)
+            - train: Training interaction matrix with held-out entries set to 0
+            - test: Test interaction matrix with only held-out entries as 1
+    """
     np.random.seed(seed)
     train = data.copy()
     test = np.zeros(data.shape)
@@ -45,7 +102,26 @@ def make_train_test_split(data, holdout_ratio=0.1, seed=1234):
             test[user, test_idx] = 1
     return train, test
 
-def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device='cpu'):
+def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=DEFAULT_TOP_N, device='cpu'):
+    """
+    Generate anime recommendations for a user's preference vector.
+    
+    Uses the trained RBM to reconstruct user preferences and recommend 
+    top-N anime that the user hasn't already liked. Filters out 
+    already-seen items and returns scored recommendations.
+    
+    Args:
+        input_vector (list, np.ndarray, or torch.Tensor): Binary user preference vector
+        rbm (RBM): Trained Restricted Boltzmann Machine model
+        anime_ids (list): List of anime IDs corresponding to vector indices
+        anime_df (pd.DataFrame): Anime metadata with 'anime_id' and 'name' columns
+        top_n (int, optional): Number of recommendations to return. Defaults to DEFAULT_TOP_N.
+        device (str, optional): Device for computation. Defaults to 'cpu'.
+        
+    Returns:
+        pd.DataFrame: Recommendations with columns ['anime_id', 'name', 'score']
+            sorted by recommendation score (highest first)
+    """
     rbm.eval()
 
     if isinstance(input_vector, (list, np.ndarray)):
@@ -72,39 +148,53 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=10, device
     return recommended[['anime_id', 'name', 'score']]
   
 
-def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df,
-                                 device='cpu', top_n=10, filename="out/recommendations.csv"):
+def generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n):
     rbm.eval()
-    user_ids = list(user_anime.index)
-    input_tensor = torch.FloatTensor(train_df.values).to(device)
-
     with torch.no_grad():
         p_h, _ = rbm.sample_h(input_tensor)
         p_v, _ = rbm.sample_v(p_h)
-        p_v[input_tensor == 1] = -1e6  # mask already-liked
-
+        p_v[input_tensor == 1] = -1e6  # mask already-liked items
+    
     scores = p_v.cpu().numpy()
+    return scores
+
+def process_user_recommendations(user_id, user_scores, anime_ids, anime_df, test_vector, top_n):
+    top_indices = user_scores.argsort()[::-1][:top_n]
+    top_anime_ids = [anime_ids[j] for j in top_indices]
+    
+    held_out_indices = np.where(test_vector.astype(int) == 1)[0]
+    held_out_ids = [anime_ids[j] for j in held_out_indices]
+    
+    user_recommendations = []
+    for j, anime_id in zip(top_indices, top_anime_ids):
+        anime_name = 'Unknown'
+        if anime_id in anime_df['anime_id'].values:
+            anime_name = anime_df.loc[anime_df['anime_id'] == anime_id, 'name'].values[0]
+        
+        user_recommendations.append({
+            'user_id': user_id,
+            'anime_id': anime_id,
+            'anime_name': anime_name,
+            'predicted_score': user_scores[j],
+            'is_held_out': anime_id in held_out_ids
+        })
+    
+    return user_recommendations
+
+def generate_recommendations_csv(rbm, train, test, user_anime, anime,
+                                 device='cpu', top_n=DEFAULT_TOP_N, filename="out/recommendations.csv"):
+    user_ids = list(user_anime.index)
     anime_ids = list(user_anime.columns)
+    input_tensor = torch.FloatTensor(train.values).to(device)
+
+    scores = generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n)
+    
     recommendation_rows = []
-
     for i, user_id in enumerate(user_ids):
-        user_scores = scores[i]
-        top_indices = user_scores.argsort()[::-1][:top_n]
-        top_anime_ids = [anime_ids[j] for j in top_indices]
-
-        held_out_vector = test_array[i].astype(int)
-        held_out_indices = np.where(held_out_vector == 1)[0]
-        held_out_ids = [anime_ids[j] for j in held_out_indices]
-
-        for j, anime_id in zip(top_indices, top_anime_ids):
-            recommendation_rows.append({
-                'user_id': user_id,
-                'anime_id': anime_id,
-                'anime_name': anime_df.loc[anime_df['anime_id'] == anime_id, 'name'].values[0]
-                              if anime_id in anime_df['anime_id'].values else 'Unknown',
-                'predicted_score': user_scores[j],
-                'is_held_out': anime_id in held_out_ids
-            })
+        user_recs = process_user_recommendations(
+            user_id, scores[i], anime_ids, anime, test[i], top_n
+        )
+        recommendation_rows.extend(user_recs)
 
     recommendation_df = pd.DataFrame(recommendation_rows)
     recommendation_df.to_csv(filename, index=False)
@@ -112,6 +202,19 @@ def generate_recommendations_csv(rbm, train_df, test_array, user_anime, anime_df
     return recommendation_df
 
 def search_anime(anime_df, query):
+    """
+    Search for anime by name across multiple title fields.
+    
+    Performs case-insensitive substring search across name, English title,
+    and Japanese title fields to find matching anime entries.
+    
+    Args:
+        anime_df (pd.DataFrame): Anime metadata dataframe
+        query (str): Search query string
+        
+    Returns:
+        pd.DataFrame: Matching anime with ID and title columns
+    """
     name_cols = ["name", "title_english", "title_japanese"]
     mask = False
     for col in name_cols:
@@ -120,10 +223,23 @@ def search_anime(anime_df, query):
     return matches[["anime_id"] + name_cols]
 
 def make_input_vector(liked_anime_ids, anime_ids):
+    """
+    Create binary input vector from user's liked anime IDs.
+    
+    Converts a list of liked anime IDs into a binary vector compatible
+    with the RBM model, where 1 indicates the user liked that anime.
+    
+    Args:
+        liked_anime_ids (list): List of anime IDs the user has liked
+        anime_ids (list): Complete list of anime IDs in the model
+        
+    Returns:
+        np.ndarray: Binary vector of length len(anime_ids)
+    """
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def plot_training_metrics(losses, precs, maps, ndcgs, K):
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=DEFAULT_FIGURE_SIZE)
     plt.plot(losses, label="Loss")
     plt.plot(precs, label=f"Precision@{K}")
     plt.plot(maps, label=f"MAP@{K}")
@@ -136,33 +252,43 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.savefig("out/training_metrics.png")
     plt.show()
 
-def interactive_recommender(user_anime, anime, rbm, device, top_n=10):
-    anime_ids = list(user_anime.columns)
+def collect_user_preferences(anime_df):
     liked_anime_ids = []
-
+    
     print("\n=== Anime Recommendation CLI ===")
     print("Search and select anime you like (press Enter without typing to finish):")
+    
     while True:
         query = input("\nSearch anime: ").strip()
         if not query:
             break
-        results = search_anime(anime, query)
+            
+        results = search_anime(anime_df, query)
         if results.empty:
             print("No matches found. Try another keyword.")
             continue
+            
         print(results)
         chosen = input("Type the anime_id (comma separated) of anime you like: ").strip()
         if chosen:
-            liked_anime_ids.extend([int(id_) for id_ in chosen.split(",") if id_.isdigit()])
+            new_ids = [int(id_) for id_ in chosen.split(",") if id_.isdigit()]
+            liked_anime_ids.extend(new_ids)
+    
+    return list(set(liked_anime_ids))
 
-    liked_anime_ids = list(set(liked_anime_ids))
+def interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N):
+    anime_ids = list(user_anime.columns)
+    
+    liked_anime_ids = collect_user_preferences(anime)
+    
     if not liked_anime_ids:
         print("No anime selected. Exiting recommender.")
         return
-
+    
     input_vector = make_input_vector(liked_anime_ids, anime_ids)
     input_vector_tensor = torch.FloatTensor(input_vector).to(device)
-    recs = get_recommendations(input_vector_tensor, rbm, anime_ids, anime, top_n=top_n, device=device)
+    recommendations = get_recommendations(input_vector_tensor, rbm, anime_ids, anime, top_n=top_n, device=device)
+    
     print("\n=== Top Recommendations for You ===")
-    print(recs)
-    return recs
+    print(recommendations)
+    return recommendations
