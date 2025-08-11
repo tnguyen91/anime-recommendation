@@ -1,6 +1,8 @@
 import json
+import os
 import time
 
+import pandas as pd
 import requests
 import torch
 import yaml
@@ -15,28 +17,51 @@ from src.data_loader import load_anime_dataset
 from src.model import RBM
 from src.utils import preprocess_data, get_recommendations, make_train_test_split
 
-with open(ANIME_METADATA_FILE, "r") as f:
-    anime_metadata = json.load(f)
+try:
+    with open(ANIME_METADATA_FILE, "r") as f:
+        anime_metadata = json.load(f)
+except FileNotFoundError:
+    print(f"Warning: Metadata file '{ANIME_METADATA_FILE}' not found. Image/genre info won't be available.")
+    anime_metadata = {}
+except json.JSONDecodeError as e:
+    print(f"Error parsing metadata JSON: {e}")
+    anime_metadata = {}
 
-with open(CONFIG_FILE, "r") as f:
-    config = yaml.safe_load(f)
+try:
+    with open(CONFIG_FILE, "r") as f:
+        config = yaml.safe_load(f)
+except FileNotFoundError:
+    print(f"Error: Configuration file '{CONFIG_FILE}' not found.")
+    exit(1)
+except yaml.YAMLError as e:
+    print(f"Error parsing YAML configuration: {e}")
+    exit(1)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = config["paths"]["model_path"]
 
-ratings, anime_df = load_anime_dataset()
-user_anime, _ = preprocess_data(
-    ratings,
-    min_likes_user=config["data"]["min_likes_user"],
-    min_likes_anime=config["data"]["min_likes_anime"]
-)
+try:
+    ratings, anime_df = load_anime_dataset()
+    user_anime, _ = preprocess_data(
+        ratings,
+        min_likes_user=config["data"]["min_likes_user"],
+        min_likes_anime=config["data"]["min_likes_anime"]
+    )
 
-anime_ids = list(user_anime.columns)
+    anime_ids = list(user_anime.columns)
 
-rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
-rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
-rbm.load_state_dict(torch.load(model_path, map_location=device))
-rbm.eval()
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+    
+    rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
+    rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
+    rbm.load_state_dict(torch.load(model_path, map_location=device))
+    rbm.eval()
+    
+except Exception as e:
+    print(f"Error initializing API: {e}")
+    print("Make sure the model is trained and data is available.")
+    exit(1)
 
 # Start Flask app
 app = Flask(__name__)
@@ -47,41 +72,53 @@ def make_input_vector(liked_anime_ids, anime_ids):
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    data = request.get_json()
-    liked_anime = data.get("liked_anime", [])
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), HTTP_BAD_REQUEST
+        
+        liked_anime = data.get("liked_anime", [])
+        if not liked_anime:
+            return jsonify({"error": "No liked anime provided"}), HTTP_BAD_REQUEST
+        
+        if not isinstance(liked_anime, list):
+            return jsonify({"error": "liked_anime must be a list"}), HTTP_BAD_REQUEST
 
-    matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
-    if not matched_ids:
-        return jsonify({"error": "No matching anime found"}), HTTP_BAD_REQUEST
+        matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
+        if not matched_ids:
+            return jsonify({"error": "No matching anime found in database"}), HTTP_BAD_REQUEST
 
-    input_vec = torch.FloatTensor([make_input_vector(matched_ids, anime_ids)]).to(device)
+        input_vec = torch.FloatTensor([make_input_vector(matched_ids, anime_ids)]).to(device)
+        recs = get_recommendations(
+            input_vec.squeeze(0),
+            rbm,
+            anime_ids,
+            anime_df,
+            top_n=DEFAULT_TOP_N,
+            device=device
+        )
 
-    recs = get_recommendations(
-        input_vec.squeeze(0),
-        rbm,
-        anime_ids,
-        anime_df,
-        top_n=DEFAULT_TOP_N,
-        device=device
-    )
+        recommendations = []
+        for _, row in recs.iterrows():
+            info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
+            image_url = info.get("image_url") if info else None
+            genre = info.get("genres", []) if info else []
+            synopsis = info.get("synopsis", "") if info else ""
+            
+            recommendations.append({
+                "anime_id": row["anime_id"],
+                "name": row["name"],
+                "title_english": row.get("title_english", ""),
+                "image_url": image_url,
+                "genre": genre,
+                "synopsis": synopsis
+            })
 
-    # Add image and genre info
-    recommendations = []
-    for _, row in recs.iterrows():
-        info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
-        image_url = info.get("image_url") if info else None
-        genre = info.get("genres", []) if info else []
-        synopsis = info.get("synopsis", "") if info else ""
-        recommendations.append({
-            "anime_id": row["anime_id"],
-            "name": row["name"],
-            "title_english": row.get("title_english", ""),
-            "image_url": image_url,
-            "genre": genre,
-            "synopsis": synopsis
-        })
-
-    return jsonify({"recommendations": recommendations})
+        return jsonify({"recommendations": recommendations})
+        
+    except Exception as e:
+        print(f"Error in recommend endpoint: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 def fetch_anime_info(anime_id):
     try:
@@ -99,35 +136,43 @@ def fetch_anime_info(anime_id):
 
 @app.route('/search-anime', methods=['GET'])
 def search_anime():
-    query = request.args.get('query', '').strip()
+    try:
+        query = request.args.get('query', '').strip()
 
-    if not query:
-        return jsonify({"results": []})
+        if not query:
+            return jsonify({"results": []})
+        
+        if len(query) > 100:
+            return jsonify({"error": "Query too long (max 100 characters)"}), HTTP_BAD_REQUEST
 
-    name_cols = ["name", "title_english", "title_japanese"]
+        name_cols = ["name", "title_english", "title_japanese"]
+        mask = False
+        for col in name_cols:
+            mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
 
-    mask = False
-    for col in name_cols:
-        mask = mask | anime_df[col].astype(str).str.contains(query, case=False, na=False)
+        matches = anime_df[mask][["anime_id", "name", "title_english"]].dropna()
 
-    matches = anime_df[mask][["anime_id", "name", "title_english"]].dropna()
+        results = []
+        for _, row in matches.iterrows():
+            info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
+            image_url = info.get("image_url") if info else None
+            genre = info.get("genres", []) if info else []
+            synopsis = info.get("synopsis", "") if info else ""
+            
+            results.append({
+                "anime_id": int(row["anime_id"]),
+                "name": row["name"],
+                "title_english": row["title_english"] if pd.notna(row["title_english"]) else "",
+                "image_url": image_url,
+                "genre": genre,
+                "synopsis": synopsis
+            })
 
-    results = []
-    for _, row in matches.iterrows():
-        info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"]))
-        image_url = info.get("image_url") if info else None
-        genre = info.get("genres", []) if info else []
-        synopsis = info.get("synopsis", "") if info else ""
-        results.append({
-            "anime_id": row["anime_id"],
-            "name": row["name"],
-            "title_english": row["title_english"],
-            "image_url": image_url,
-            "genre": genre,
-            "synopsis": synopsis
-        })
-
-    return jsonify({"results": results})
+        return jsonify({"results": results})
+        
+    except Exception as e:
+        print(f"Error in search endpoint: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     app.run(host=DEFAULT_API_HOST, port=DEFAULT_API_PORT, debug=True)

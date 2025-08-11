@@ -16,42 +16,72 @@ from src.model import RBM
 from src.train import train_rbm
 from src.utils import preprocess_data, make_train_test_split, generate_recommendations_csv, plot_training_metrics, interactive_recommender
 
-# Load config
-with open(CONFIG_FILE, "r") as f:
-    config = yaml.safe_load(f)
-
-model_config = config["model"]
-data_config = config["data"]
-path_config = config["paths"]
+try:
+    with open(CONFIG_FILE, "r") as f:
+        config = yaml.safe_load(f)
+    
+    model_config = config["model"]
+    data_config = config["data"]
+    path_config = config["paths"]
+except FileNotFoundError:
+    print(f"Error: Configuration file '{CONFIG_FILE}' not found.")
+    exit(1)
+except yaml.YAMLError as e:
+    print(f"Error parsing YAML configuration: {e}")
+    exit(1)
+except KeyError as e:
+    print(f"Error: Missing required configuration section: {e}")
+    exit(1)
 
 np.random.seed(DEFAULT_SEED)
 torch.manual_seed(DEFAULT_SEED)
 
 def load_and_preprocess_data(data_config):
-    print("Loading data...")
-    ratings, anime = load_anime_dataset()
-    user_anime, _ = preprocess_data(
-        ratings, 
-        min_likes_user=data_config["min_likes_user"], 
-        min_likes_anime=data_config["min_likes_anime"]
-    )
-    print("user_anime shape:", user_anime.shape)
-    print("ratings shape:", ratings.shape)
-    return ratings, anime, user_anime
+    try:
+        print("Loading data...")
+        ratings, anime = load_anime_dataset()
+        
+        if ratings.empty or anime.empty:
+            raise ValueError("Dataset is empty after loading")
+        
+        user_anime, _ = preprocess_data(
+            ratings, 
+            min_likes_user=data_config["min_likes_user"], 
+            min_likes_anime=data_config["min_likes_anime"]
+        )
+        
+        if user_anime.empty:
+            raise ValueError("No data remaining after preprocessing filters")
+        
+        print("user_anime shape:", user_anime.shape)
+        print("ratings shape:", ratings.shape)
+        return ratings, anime, user_anime
+        
+    except Exception as e:
+        print(f"Error loading or preprocessing data: {e}")
+        raise
 
 def prepare_train_test_data(user_anime, data_config):
-    print("Creating train-test split...")
-    train, test = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
-    held_out_counts = test.sum(axis=1)
-    print("Test split stats:\n", pd.Series(held_out_counts).describe())
+    try:
+        print("Creating train-test split...")
+        train, test = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
+        held_out_counts = test.sum(axis=1)
+        print("Test split stats:\n", pd.Series(held_out_counts).describe())
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
 
-    train_tensor = torch.FloatTensor(train.values).to(device)
-    test_tensor = torch.FloatTensor(test).to(device)
-    
-    return train, test, train_tensor, test_tensor, device
+        if train.empty or test.size == 0:
+            raise ValueError("Train-test split resulted in empty data")
+
+        train_tensor = torch.FloatTensor(train.values).to(device)
+        test_tensor = torch.FloatTensor(test).to(device)
+        
+        return train, test, train_tensor, test_tensor, device
+        
+    except Exception as e:
+        print(f"Error preparing train-test data: {e}")
+        raise
 
 def train_model_workflow(rbm, train_tensor, test_tensor, train, test, user_anime, anime, device, **kwargs):
     epochs = kwargs['epochs']
@@ -75,13 +105,21 @@ def train_model_workflow(rbm, train_tensor, test_tensor, train, test, user_anime
     return rbm
 
 def load_pretrained_model(rbm, model_path, device):
-    if os.path.exists(model_path):
+    try:
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        
         rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
         rbm.load_state_dict(torch.load(model_path, map_location=device))
         print(f"Loaded trained RBM from {model_path}")
         return rbm
-    else:
-        print(f"Trained model '{model_path}' not found. Please train first or specify the correct path.")
+        
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        print("Please train the model first or specify the correct path.")
+        return None
+    except Exception as e:
+        print(f"Error loading model: {e}")
         return None
 
 def main(train_model=True,
