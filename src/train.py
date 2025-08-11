@@ -1,4 +1,5 @@
 import torch
+
 from src.evaluate import evaluate_at_k
 
 def train_rbm(rbm, train_tensor, test_tensor, 

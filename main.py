@@ -1,13 +1,15 @@
-from src.data_loader import load_anime_dataset
-from src.utils import preprocess_data, make_train_test_split, generate_recommendations_csv, plot_training_metrics, interactive_recommender
-from src.model import RBM
-from src.train import train_rbm
-import torch
+import argparse
+import os
+
 import numpy as np
 import pandas as pd
-import os
-import argparse
+import torch
 import yaml
+
+from src.data_loader import load_anime_dataset
+from src.model import RBM
+from src.train import train_rbm
+from src.utils import preprocess_data, make_train_test_split, generate_recommendations_csv, plot_training_metrics, interactive_recommender
 
 # Load config
 with open("config.yaml", "r") as f:

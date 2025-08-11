@@ -1,7 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import matplotlib.pyplot as plt
 
 def filter_hentai(ratings, anime):
     mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)

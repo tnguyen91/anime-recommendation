@@ -1,9 +1,12 @@
-import os
 import glob
-import pandas as pd
-import numpy as np
+import os
+
 import kagglehub
+import numpy as np
+import pandas as pd
+
 from src.utils import filter_hentai
+
 os.environ["KAGGLEHUB_CACHE"] = "./data"
 
 def load_anime_dataset():

@@ -1,13 +1,15 @@
+import json
+import time
+
+import requests
+import torch
+import yaml
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import torch
+
 from src.data_loader import load_anime_dataset
-from src.utils import preprocess_data, get_recommendations, make_train_test_split
 from src.model import RBM
-import yaml
-import requests
-import time
-import json
+from src.utils import preprocess_data, get_recommendations, make_train_test_split
 with open("data/anime_metadata.json", "r") as f:
     anime_metadata = json.load(f)
 

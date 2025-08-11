@@ -1,14 +1,16 @@
-import itertools
-import torch
-from src.data_loader import load_anime_dataset
-from src.utils import preprocess_data, make_train_test_split
-from src.model import RBM
-from src.train import train_rbm
 import csv
+import itertools
 import os
 import random
+
 import numpy as np
+import torch
 import yaml
+
+from src.data_loader import load_anime_dataset
+from src.model import RBM
+from src.train import train_rbm
+from src.utils import preprocess_data, make_train_test_split
 
 seed = 42
 random.seed(seed)

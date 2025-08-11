@@ -1,6 +1,8 @@
-import requests
 import json
 import time
+
+import requests
+
 from src.data_loader import load_anime_dataset
 
 OUTPUT_FILE = "data/anime_metadata.json"

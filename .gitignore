@@ -5,7 +5,7 @@ __pycache__/
 *.pyd
 env/
 venv/
-dataset/
+datasets/
 *.pth
 *.csv
 .env
