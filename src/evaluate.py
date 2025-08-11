@@ -1,6 +1,26 @@
 import torch
 
 def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
+    """
+    Evaluate RBM performance using precision@K, MAP@K, and NDCG@K metrics.
+    
+    Computes recommendation quality metrics by reconstructing user preferences
+    through the RBM and measuring how well top-K recommendations match held-out
+    test interactions. Masks out already-seen items during evaluation.
+    
+    Args:
+        rbm (RBM): Trained Restricted Boltzmann Machine model
+        train_tensor (torch.Tensor): Training user-item interaction matrix (binary)
+        test_tensor (torch.Tensor): Test user-item interaction matrix (binary) 
+        k (int, optional): Number of top recommendations to evaluate. Defaults to 10.
+        device (str, optional): Device to run evaluation on. Defaults to 'cpu'.
+        
+    Returns:
+        tuple: (mean_precision, mean_ap, mean_ndcg)
+            - mean_precision: Average precision@K across all users
+            - mean_ap: Mean Average Precision@K across all users
+            - mean_ndcg: Mean Normalized Discounted Cumulative Gain@K across all users
+    """
     rbm.eval()
     train_tensor = train_tensor.to(device)
     test_tensor = test_tensor.to(device)

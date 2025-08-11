@@ -72,6 +72,31 @@ def make_input_vector(liked_anime_ids, anime_ids):
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
+    """
+    Generate anime recommendations based on user's liked anime.
+    
+    API endpoint that accepts a list of anime names, converts them to 
+    a binary preference vector, and returns top-N recommendations using 
+    the trained RBM model.
+    
+    Request JSON:
+        {
+            "liked_anime": ["Anime Name 1", "Anime Name 2", ...]
+        }
+        
+    Returns:
+        JSON response with recommendations or error message:
+        {
+            "recommendations": [
+                {"anime_id": int, "name": str, "score": float}, ...
+            ]
+        }
+        
+    Status Codes:
+        200: Success with recommendations
+        400: Bad request (invalid input)
+        500: Internal server error
+    """
     try:
         data = request.get_json()
         if not data:
@@ -136,6 +161,28 @@ def fetch_anime_info(anime_id):
 
 @app.route('/search-anime', methods=['GET'])
 def search_anime():
+    """
+    Search for anime by name across multiple title fields.
+    
+    API endpoint that searches anime database using case-insensitive 
+    substring matching across name, English title, and Japanese title fields.
+    
+    Query Parameters:
+        q (str): Search query string (required)
+        
+    Returns:
+        JSON response with matching anime:
+        {
+            "results": [
+                {"anime_id": int, "name": str, "title_english": str, "title_japanese": str}, ...
+            ]
+        }
+        
+    Status Codes:
+        200: Success with search results (may be empty list)
+        400: Bad request (missing query parameter)
+        500: Internal server error
+    """
     try:
         query = request.args.get('query', '').strip()
 

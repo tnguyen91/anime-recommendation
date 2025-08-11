@@ -9,12 +9,46 @@ from constants import (
 )
 
 def filter_hentai(ratings, anime):
+    """
+    Filter out adult/hentai content from anime datasets.
+    
+    Removes anime entries and corresponding ratings that contain 'Hentai'
+    in any of their metadata fields to create a cleaner dataset suitable
+    for general recommendation purposes.
+    
+    Args:
+        ratings (pd.DataFrame): User ratings dataframe with 'anime_id' column
+        anime (pd.DataFrame): Anime metadata dataframe with 'anime_id' column
+        
+    Returns:
+        tuple: (ratings_clean, anime_clean)
+            - ratings_clean: Filtered ratings dataframe
+            - anime_clean: Filtered anime metadata dataframe
+    """
     mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)
     anime_clean = anime[mask]
     ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['anime_id'])]
     return ratings_clean, anime_clean
 
 def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
+    """
+    Preprocess ratings data for collaborative filtering.
+    
+    Converts ratings to binary likes/dislikes, filters out inactive users and
+    unpopular anime, and creates a user-item interaction matrix. Only considers
+    completed anime ratings and applies minimum interaction thresholds.
+    
+    Args:
+        ratings_df (pd.DataFrame): Raw ratings data with columns:
+            ['user_id', 'anime_id', 'score', 'status']
+        min_likes_user (int, optional): Minimum likes per user. Defaults to 100.
+        min_likes_anime (int, optional): Minimum likes per anime. Defaults to 50.
+        
+    Returns:
+        tuple: (user_anime, ratings_df)
+            - user_anime: Binary user-item interaction matrix (pivot table)
+            - ratings_df: Processed ratings dataframe with 'liked' column
+    """
     ratings_df = ratings_df.copy()
     ratings_df = ratings_df[ratings_df['status'] == 'Completed']
     ratings_df['liked'] = (ratings_df['score'] >= RATING_THRESHOLD).astype(int)
@@ -37,6 +71,23 @@ def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
     return user_anime, ratings_df
 
 def make_train_test_split(data, holdout_ratio=0.1, seed=DEFAULT_SEED):
+    """
+    Create train/test split by randomly holding out user interactions.
+    
+    Randomly selects a fraction of positive interactions for each user
+    to use as test data, while keeping the remaining interactions for training.
+    Maintains user activity levels by only holding out from existing interactions.
+    
+    Args:
+        data (pd.DataFrame): User-item interaction matrix (users as rows, items as columns)
+        holdout_ratio (float, optional): Fraction of interactions to hold out. Defaults to 0.1.
+        seed (int, optional): Random seed for reproducibility. Defaults to DEFAULT_SEED.
+        
+    Returns:
+        tuple: (train, test)
+            - train: Training interaction matrix with held-out entries set to 0
+            - test: Test interaction matrix with only held-out entries as 1
+    """
     np.random.seed(seed)
     train = data.copy()
     test = np.zeros(data.shape)
@@ -51,6 +102,25 @@ def make_train_test_split(data, holdout_ratio=0.1, seed=DEFAULT_SEED):
     return train, test
 
 def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=DEFAULT_TOP_N, device='cpu'):
+    """
+    Generate anime recommendations for a user's preference vector.
+    
+    Uses the trained RBM to reconstruct user preferences and recommend 
+    top-N anime that the user hasn't already liked. Filters out 
+    already-seen items and returns scored recommendations.
+    
+    Args:
+        input_vector (list, np.ndarray, or torch.Tensor): Binary user preference vector
+        rbm (RBM): Trained Restricted Boltzmann Machine model
+        anime_ids (list): List of anime IDs corresponding to vector indices
+        anime_df (pd.DataFrame): Anime metadata with 'anime_id' and 'name' columns
+        top_n (int, optional): Number of recommendations to return. Defaults to DEFAULT_TOP_N.
+        device (str, optional): Device for computation. Defaults to 'cpu'.
+        
+    Returns:
+        pd.DataFrame: Recommendations with columns ['anime_id', 'name', 'score']
+            sorted by recommendation score (highest first)
+    """
     rbm.eval()
 
     if isinstance(input_vector, (list, np.ndarray)):
@@ -131,6 +201,19 @@ def generate_recommendations_csv(rbm, train, test, user_anime, anime,
     return recommendation_df
 
 def search_anime(anime_df, query):
+    """
+    Search for anime by name across multiple title fields.
+    
+    Performs case-insensitive substring search across name, English title,
+    and Japanese title fields to find matching anime entries.
+    
+    Args:
+        anime_df (pd.DataFrame): Anime metadata dataframe
+        query (str): Search query string
+        
+    Returns:
+        pd.DataFrame: Matching anime with ID and title columns
+    """
     name_cols = ["name", "title_english", "title_japanese"]
     mask = False
     for col in name_cols:
@@ -139,6 +222,19 @@ def search_anime(anime_df, query):
     return matches[["anime_id"] + name_cols]
 
 def make_input_vector(liked_anime_ids, anime_ids):
+    """
+    Create binary input vector from user's liked anime IDs.
+    
+    Converts a list of liked anime IDs into a binary vector compatible
+    with the RBM model, where 1 indicates the user liked that anime.
+    
+    Args:
+        liked_anime_ids (list): List of anime IDs the user has liked
+        anime_ids (list): Complete list of anime IDs in the model
+        
+    Returns:
+        np.ndarray: Binary vector of length len(anime_ids)
+    """
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def plot_training_metrics(losses, precs, maps, ndcgs, K):

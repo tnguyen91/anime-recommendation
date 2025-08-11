@@ -37,29 +37,33 @@ np.random.seed(DEFAULT_SEED)
 torch.manual_seed(DEFAULT_SEED)
 
 def load_and_preprocess_data(data_config):
-    try:
-        print("Loading data...")
-        ratings, anime = load_anime_dataset()
-        
-        if ratings.empty or anime.empty:
-            raise ValueError("Dataset is empty after loading")
-        
-        user_anime, _ = preprocess_data(
-            ratings, 
-            min_likes_user=data_config["min_likes_user"], 
-            min_likes_anime=data_config["min_likes_anime"]
-        )
-        
-        if user_anime.empty:
-            raise ValueError("No data remaining after preprocessing filters")
-        
-        print("user_anime shape:", user_anime.shape)
-        print("ratings shape:", ratings.shape)
-        return ratings, anime, user_anime
-        
-    except Exception as e:
-        print(f"Error loading or preprocessing data: {e}")
-        raise
+    """
+    Load datasets and preprocess for collaborative filtering.
+    
+    Loads anime ratings and metadata from Kaggle datasets, filters out
+    adult content, and preprocesses into binary user-item interactions
+    with minimum activity thresholds.
+
+    Returns:
+        tuple: (ratings, anime, user_anime)
+    """
+    ratings, anime = load_anime_dataset()
+
+    if ratings.empty or anime.empty:
+        raise ValueError("Dataset is empty after loading")
+
+    user_anime, _ = preprocess_data(
+        ratings,
+        min_likes_user=data_config["min_likes_user"],
+        min_likes_anime=data_config["min_likes_anime"]
+    )
+    
+    if user_anime.empty:
+        raise ValueError("No data remaining after preprocessing filters")
+    
+    print("user_anime shape:", user_anime.shape)
+    print("ratings shape:", ratings.shape)
+    return ratings, anime, user_anime
 
 def prepare_train_test_data(user_anime, data_config):
     try:
