@@ -27,20 +27,19 @@ path_config = config["paths"]
 np.random.seed(DEFAULT_SEED)
 torch.manual_seed(DEFAULT_SEED)
 
-def main(train_model=True,
-         run_cli=True,
-         n_hidden=DEFAULT_N_HIDDEN,
-         epochs=DEFAULT_EPOCHS,
-         batch_size=DEFAULT_BATCH_SIZE,
-         learning_rate=DEFAULT_LEARNING_RATE,
-         k=DEFAULT_K,
-         model_path='out/rbm_best_model.pth'):
+def load_and_preprocess_data(data_config):
     print("Loading data...")
     ratings, anime = load_anime_dataset()
-    user_anime, _ = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
+    user_anime, _ = preprocess_data(
+        ratings, 
+        min_likes_user=data_config["min_likes_user"], 
+        min_likes_anime=data_config["min_likes_anime"]
+    )
     print("user_anime shape:", user_anime.shape)
     print("ratings shape:", ratings.shape)
+    return ratings, anime, user_anime
 
+def prepare_train_test_data(user_anime, data_config):
     print("Creating train-test split...")
     train, test = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
     held_out_counts = test.sum(axis=1)
@@ -51,29 +50,66 @@ def main(train_model=True,
 
     train_tensor = torch.FloatTensor(train.values).to(device)
     test_tensor = torch.FloatTensor(test).to(device)
+    
+    return train, test, train_tensor, test_tensor, device
 
+def train_model_workflow(rbm, train_tensor, test_tensor, train, test, user_anime, anime, device, **kwargs):
+    epochs = kwargs['epochs']
+    batch_size = kwargs['batch_size'] 
+    learning_rate = kwargs['learning_rate']
+    k = kwargs['k']
+    
+    print(f"Training hyperparameter: \nepochs-{epochs}    batch_size-{batch_size}    learning_rate-{learning_rate}   n_hidden-{kwargs['n_hidden']}")
+    
+    rbm, losses, precs, maps, ndcgs = train_rbm(
+        rbm, train_tensor, test_tensor,
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        k=k,
+        device=device
+    )
+    
+    plot_training_metrics(losses, precs, maps, ndcgs, k)
+    generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device)
+    return rbm
+
+def load_pretrained_model(rbm, model_path, device):
+    if os.path.exists(model_path):
+        rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
+        rbm.load_state_dict(torch.load(model_path, map_location=device))
+        print(f"Loaded trained RBM from {model_path}")
+        return rbm
+    else:
+        print(f"Trained model '{model_path}' not found. Please train first or specify the correct path.")
+        return None
+
+def main(train_model=True,
+         run_cli=True,
+         n_hidden=DEFAULT_N_HIDDEN,
+         epochs=DEFAULT_EPOCHS,
+         batch_size=DEFAULT_BATCH_SIZE,
+         learning_rate=DEFAULT_LEARNING_RATE,
+         k=DEFAULT_K,
+         model_path='out/rbm_best_model.pth'):
+    
+    ratings, anime, user_anime = load_and_preprocess_data(data_config)
+    
+    train, test, train_tensor, test_tensor, device = prepare_train_test_data(user_anime, data_config)
+    
     rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
 
     if train_model:
-        print(f"Training hyperparameter: \nepochs-{epochs}    batch_size-{batch_size}    learning_rate-{learning_rate}   n_hidden-{n_hidden}")
-        rbm, losses, precs, maps, ndcgs = train_rbm(
-            rbm, train_tensor, test_tensor,
-            epochs=epochs,
-            batch_size=batch_size,
-            learning_rate=learning_rate,
-            k=k,
-            device=device
+        rbm = train_model_workflow(
+            rbm, train_tensor, test_tensor, train, test, user_anime, anime, device,
+            n_hidden=n_hidden, epochs=epochs, batch_size=batch_size, 
+            learning_rate=learning_rate, k=k
         )
-        plot_training_metrics(losses, precs, maps, ndcgs, k)
-        generate_recommendations_csv(rbm, train, test, user_anime, anime, device=device)
     else:
-        if os.path.exists(model_path):
-            rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
-            rbm.load_state_dict(torch.load(model_path, map_location=device))
-            print(f"Loaded trained RBM from {model_path}")
-        else:
-            print(f"Trained model '{model_path}' not found. Please train first or specify the correct path.")
+        rbm = load_pretrained_model(rbm, model_path, device)
+        if rbm is None:
             return
+    
     if run_cli:
         interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N)
 

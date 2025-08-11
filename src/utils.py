@@ -77,39 +77,53 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=DEFAULT_TO
     return recommended[['anime_id', 'name', 'score']]
   
 
-def generate_recommendations_csv(rbm, train, test, user_anime, anime,
-                                 device='cpu', top_n=DEFAULT_TOP_N, filename="out/recommendations.csv"):
+def generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n):
     rbm.eval()
-    user_ids = list(user_anime.index)
-    input_tensor = torch.FloatTensor(train.values).to(device)
-
     with torch.no_grad():
         p_h, _ = rbm.sample_h(input_tensor)
         p_v, _ = rbm.sample_v(p_h)
-        p_v[input_tensor == 1] = -1e6  # mask already-liked
-
+        p_v[input_tensor == 1] = -1e6  # mask already-liked items
+    
     scores = p_v.cpu().numpy()
+    return scores
+
+def process_user_recommendations(user_id, user_scores, anime_ids, anime_df, test_vector, top_n):
+    top_indices = user_scores.argsort()[::-1][:top_n]
+    top_anime_ids = [anime_ids[j] for j in top_indices]
+    
+    held_out_indices = np.where(test_vector.astype(int) == 1)[0]
+    held_out_ids = [anime_ids[j] for j in held_out_indices]
+    
+    user_recommendations = []
+    for j, anime_id in zip(top_indices, top_anime_ids):
+        anime_name = 'Unknown'
+        if anime_id in anime_df['anime_id'].values:
+            anime_name = anime_df.loc[anime_df['anime_id'] == anime_id, 'name'].values[0]
+        
+        user_recommendations.append({
+            'user_id': user_id,
+            'anime_id': anime_id,
+            'anime_name': anime_name,
+            'predicted_score': user_scores[j],
+            'is_held_out': anime_id in held_out_ids
+        })
+    
+    return user_recommendations
+
+def generate_recommendations_csv(rbm, train, test, user_anime, anime,
+                                 device='cpu', top_n=DEFAULT_TOP_N, filename="out/recommendations.csv"):
+    user_ids = list(user_anime.index)
     anime_ids = list(user_anime.columns)
+    input_tensor = torch.FloatTensor(train.values).to(device)
+
+    scores = generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n)
+    
     recommendation_rows = []
-
     for i, user_id in enumerate(user_ids):
-        user_scores = scores[i]
-        top_indices = user_scores.argsort()[::-1][:top_n]
-        top_anime_ids = [anime_ids[j] for j in top_indices]
-
-        held_out_vector = test[i].astype(int)
-        held_out_indices = np.where(held_out_vector == 1)[0]
-        held_out_ids = [anime_ids[j] for j in held_out_indices]
-
-        for j, anime_id in zip(top_indices, top_anime_ids):
-            recommendation_rows.append({
-                'user_id': user_id,
-                'anime_id': anime_id,
-                'anime_name': anime.loc[anime['anime_id'] == anime_id, 'name'].values[0]
-                              if anime_id in anime['anime_id'].values else 'Unknown',
-                'predicted_score': user_scores[j],
-                'is_held_out': anime_id in held_out_ids
-            })
+        user_recs = process_user_recommendations(
+            user_id, scores[i], anime_ids, anime, test[i], top_n
+        )
+        recommendation_rows.extend(user_recs)
 
     recommendation_df = pd.DataFrame(recommendation_rows)
     recommendation_df.to_csv(filename, index=False)
@@ -141,33 +155,43 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.savefig("out/training_metrics.png")
     plt.show()
 
-def interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N):
-    anime_ids = list(user_anime.columns)
+def collect_user_preferences(anime_df):
     liked_anime_ids = []
-
+    
     print("\n=== Anime Recommendation CLI ===")
     print("Search and select anime you like (press Enter without typing to finish):")
+    
     while True:
         query = input("\nSearch anime: ").strip()
         if not query:
             break
-        results = search_anime(anime, query)
+            
+        results = search_anime(anime_df, query)
         if results.empty:
             print("No matches found. Try another keyword.")
             continue
+            
         print(results)
         chosen = input("Type the anime_id (comma separated) of anime you like: ").strip()
         if chosen:
-            liked_anime_ids.extend([int(id_) for id_ in chosen.split(",") if id_.isdigit()])
+            new_ids = [int(id_) for id_ in chosen.split(",") if id_.isdigit()]
+            liked_anime_ids.extend(new_ids)
+    
+    return list(set(liked_anime_ids))
 
-    liked_anime_ids = list(set(liked_anime_ids))
+def interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N):
+    anime_ids = list(user_anime.columns)
+    
+    liked_anime_ids = collect_user_preferences(anime)
+    
     if not liked_anime_ids:
         print("No anime selected. Exiting recommender.")
         return
-
+    
     input_vector = make_input_vector(liked_anime_ids, anime_ids)
     input_vector_tensor = torch.FloatTensor(input_vector).to(device)
-    recs = get_recommendations(input_vector_tensor, rbm, anime_ids, anime, top_n=top_n, device=device)
+    recommendations = get_recommendations(input_vector_tensor, rbm, anime_ids, anime, top_n=top_n, device=device)
+    
     print("\n=== Top Recommendations for You ===")
-    print(recs)
-    return recs
+    print(recommendations)
+    return recommendations

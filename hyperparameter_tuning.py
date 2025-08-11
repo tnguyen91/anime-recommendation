@@ -27,10 +27,8 @@ with open(CONFIG_FILE, "r") as f:
 data_config = config["data"]
 path_config = config["paths"]
 
-# Grid search parameters
 param_grid = HYPERPARAMETER_GRID
 
-# Load data
 ratings, anime = load_anime_dataset()
 user_anime, _ = preprocess_data(ratings, min_likes_user=data_config["min_likes_user"], min_likes_anime=data_config["min_likes_anime"])
 train_df, test_array = make_train_test_split(user_anime, holdout_ratio=data_config["holdout_ratio"])
@@ -51,13 +49,13 @@ for combo in itertools.product(*param_grid.values()):
     rbm, losses, precs, maps, ndcgs = train_rbm(
             rbm, train_tensor, test_tensor,
             epochs=HYPERPARAMETER_EPOCHS,
-            batch_size=params["batch_size"],
-            learning_rate=params["learning_rate"],
+            batch_size=param_grid["batch_size"],
+            learning_rate=param_grid["learning_rate"],
             k=DEFAULT_K,
             device=device
         )
 
-    final_precision = precisions[-1]
+    final_precision = precs[-1]
     final_ndcg = ndcgs[-1]
     final_map = maps[-1]
 
