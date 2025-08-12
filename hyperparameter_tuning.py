@@ -41,19 +41,19 @@ print(f"Using {device}")
 best_map = -1
 best_params = None
 
-for combo in itertools.product(*param_grid.values()):
+for combo in itertools.product(param_grid["n_hidden"], param_grid["learning_rate"], param_grid["batch_size"]):
     n_hidden, learning_rate, batch_size = combo
     print(f"\nTesting: n_hidden={n_hidden}, lr={learning_rate}, batch_size={batch_size}")
 
     rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
     rbm, losses, precs, maps, ndcgs = train_rbm(
-            rbm, train_tensor, test_tensor,
-            epochs=HYPERPARAMETER_EPOCHS,
-            batch_size=param_grid["batch_size"],
-            learning_rate=param_grid["learning_rate"],
-            k=DEFAULT_K,
-            device=device
-        )
+        rbm, train_tensor, test_tensor,
+        epochs=HYPERPARAMETER_EPOCHS,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        k=DEFAULT_K,
+        device=device
+    )
 
     final_precision = precs[-1]
     final_ndcg = ndcgs[-1]
