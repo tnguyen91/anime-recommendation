@@ -102,7 +102,8 @@ def check_early_stopping(mean_ap, best_map, patience_counter, patience, rbm):
     if mean_ap > best_map:
         best_map = mean_ap
         patience_counter = 0
-        best_model_state = rbm.state_dict().copy()
+        # Deep copy tensors to avoid in-place mutation in later epochs
+        best_model_state = {k: v.clone() for k, v in rbm.state_dict().items()}
         should_stop = False
     else:
         patience_counter += 1
