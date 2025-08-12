@@ -1,5 +1,4 @@
-import torch
-
+import os
 import torch
 from typing import Tuple, Optional, List
 
@@ -7,7 +6,6 @@ from constants import CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENC
 from constants import (
     DEFAULT_EPOCHS, DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
 )
-from src.evaluate import evaluate_at_k
 from src.evaluate import evaluate_at_k
 
 def train_single_batch(rbm, optimizer, batch):
@@ -114,27 +112,14 @@ def check_early_stopping(mean_ap, best_map, patience_counter, patience, rbm):
     
     return best_map, patience_counter, should_stop, best_model_state
 
-def save_best_model(rbm, best_model_state, best_map, k):
-    """
-    Load best model state and save quantized version to disk.
-    
-    Restores the model to its best performing state and applies dynamic
-    quantization to reduce model size before saving. Only saves if a
-    best model state exists.
-    
-    Args:
-        rbm (RBM): Model to update with best weights
-        best_model_state (dict or None): Best model state dictionary
-        best_map (float): Best MAP score achieved during training
-        k (int): Top-K parameter used for evaluation
-    """
-    if best_model_state is not None:
-        rbm.load_state_dict(best_model_state)
-        quantized_rbm = torch.quantization.quantize_dynamic(
-            rbm, {torch.nn.Linear}, dtype=torch.qint8
-        )
-        torch.save(quantized_rbm.state_dict(), "out/rbm_best_model.pth")
-        print(f"Best model saved with MAP@{k}: {best_map:.4f}")
+def save_best_model(rbm, best_model_state, best_map, k, model_path: str = "out/rbm_best_model.pth"):
+    """Restore best model state and save plain state_dict."""
+    if best_model_state is None:
+        return
+    rbm.load_state_dict(best_model_state)
+    os.makedirs(os.path.dirname(model_path) or '.', exist_ok=True)
+    torch.save(rbm.state_dict(), model_path)
+    print(f"Best model saved with MAP@{k}: {best_map:.4f} -> {model_path}")
 
 def train_rbm(rbm, train_tensor, test_tensor, 
               epochs=DEFAULT_EPOCHS, batch_size=DEFAULT_BATCH_SIZE, 

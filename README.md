@@ -51,7 +51,7 @@ A machine learning-based anime recommendation system that leverages **Restricted
 - **Architecture**: Visible units (anime) ↔ Hidden units (latent factors)
 - **Training**: Contrastive Divergence with Adam optimizer
 - **Evaluation**: Top-K ranking metrics on held-out interactions
-- **Features**: Early stopping, model quantization, GPU acceleration
+- **Features**: Early stopping, GPU acceleration
 
 ## Project Structure
 

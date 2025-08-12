@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Anime Recommendation System - REST API Server
 
@@ -66,7 +65,6 @@ try:
         raise FileNotFoundError(f"Model file not found: {model_path}")
     
     rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
-    rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
     rbm.load_state_dict(torch.load(model_path, map_location=device))
     rbm.eval()
     

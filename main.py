@@ -124,12 +124,10 @@ def load_pretrained_model(rbm, model_path, device):
     try:
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
-        
-        rbm = torch.quantization.quantize_dynamic(rbm, {torch.nn.Linear}, dtype=torch.qint8)
-        rbm.load_state_dict(torch.load(model_path, map_location=device))
+        payload = torch.load(model_path, map_location=device)
+        rbm.load_state_dict(payload)
         print(f"Loaded trained RBM from {model_path}")
         return rbm
-        
     except FileNotFoundError as e:
         print(f"Error: {e}")
         print("Please train the model first or specify the correct path.")
