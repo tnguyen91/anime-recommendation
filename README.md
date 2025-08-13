@@ -53,61 +53,36 @@ A machine learning-based anime recommendation system that leverages **Restricted
 - **Evaluation**: Top-K ranking metrics on held-out interactions
 - **Features**: Early stopping, GPU acceleration
 
-## Project Structure
+## Project Structure (Refactored for Multi-Model Support)
 
 ```
 anime-recommendation/
-├── .dockerignore
-├── .gitignore
-├── hyperparameter_tuning.py
-├── data_analysis.ipynb
-├── api.py
-├── main.py
-├── build_metadata_cache.py
-├── config.yaml
-├── requirements.txt
-├── Dockerfile
 ├── docker-compose.yml
+├── requirements.txt
 ├── README.md
 ├── data/
 │   ├── datasets/
-│   ├── anime_metadata.json
-├── out/
-│   ├── tuning_results.csv
-│   ├── training_metrics.png
-│   ├── recommendations.csv
-│   └── rbm_best_model.pth
-├── src/
-│   ├── data_loader.py
-│   ├── evaluate.py
-│   ├── model.py
-│   ├── train.py
-│   └── utils.py
-├── anime-recommender-ui/
-│   ├── .env
+│   └── anime_metadata.json
+├── anime-recommender-ui/        # React frontend
+│   └── ...
+├── rbm/                        # RBM implementation
 │   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── public/
-│   │   ├── index.html
-│   │   ├── favicon.ico
-│   │   └── bg.png
-│   └── src/
-│       ├── App.js
-│       ├── App.css
-│       ├── index.js
-│       ├── index.css
-│       ├── components/
-│       │   ├── SearchBar.js
-│       │   └── AnimeCard.js
-│       ├── pages/
-│       │   └── Home.js
-│       └── utils/
-│           └── api.js
+│   ├── api.py
+│   ├── main.py
+│   ├── hyperparameter_tuning.py
+│   ├── build_metadata_cache.py
+│   ├── config.yaml
+│   ├── constants.py
+│   ├── __init__.py
+│   ├── src/
+│   │   ├── __init__.py
+│   │   ├── data_loader.py
+│   │   ├── evaluate.py
+│   │   ├── model.py
+│   │   ├── train.py
+│   │   └── utils.py
+│   └── out/
 ```
-
----
 
 ## Installation
 
@@ -171,7 +146,7 @@ npm start
 
 ## Config File
 
-Training settings can be changed in `config.yaml`:
+Training settings now live in `rbm/config.yaml` (the legacy root `config.yaml` was removed to avoid confusion):
 ```yaml
 model:
   n_hidden: 1024
@@ -217,9 +192,12 @@ The frontend expects a `.env` file in the `anime-recommender-ui/` directory.
 
 ## Outputs
 
-- `recommendations.csv` – top-N anime per user + hit flag
-- `training_metrics.png` – training loss and evaluation metrics
-- `rbm_best_model.pth` – best saved weights
+Runtime artifacts are written under the model folder (e.g. `rbm/out/`). Legacy root `out/` may still contain older runs; you can delete it safely once migrated.
+
+- `rbm/out/rbm_best_model.pth` – best saved weights
+- `rbm/out/recommendations.csv` – top-N anime per user + hit flag
+- `rbm/out/training_metrics.png` – training loss and evaluation metrics
+- `rbm/out/tuning_results.csv` – hyperparameter search log (if tuning run)
 
 ---
 
@@ -231,36 +209,4 @@ The frontend expects a `.env` file in the `anime-recommender-ui/` directory.
 | **MAP@K**       | Mean Average Precision at K: captures both correctness and order of recommendations. |
 | **NDCG@K**      | Normalized Discounted Cumulative Gain: gives higher weight to relevant items ranked higher. |
 
-![Training Metrics](out/training_metrics.png)
-
----
-
-## Results & Performance
-
-The RBM model achieves competitive performance on the MyAnimeList dataset:
-
-- **Precision@10**: ~0.15-0.25 (typical for recommendation systems)
-- **MAP@10**: ~0.08-0.15 
-- **NDCG@10**: ~0.12-0.20
-
-Training typically converges within 20-30 epochs with early stopping based on MAP improvements.
-
----
-
-## Future Improvements
-
-- [ ] Add content-based features (genres, studios, year)
-- [ ] Implement other recommendation algorithms (Matrix Factorization, Neural CF)
-- [ ] Add user authentication and personalized profiles
-- [ ] Implement real-time recommendation updates
-- [ ] Add A/B testing framework for recommendation quality
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+![Training Metrics](rbm/out/training_metrics.png)

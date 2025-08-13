@@ -7,6 +7,7 @@ venv/
 *.csv
 *.pth
 *.json
+!data/anime_metadata.json
 .git
 .gitignore
 .ipynb_checkpoints
