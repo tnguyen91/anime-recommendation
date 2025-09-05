@@ -58,6 +58,9 @@ def save_best_model(rbm, best_model_state, best_map, k, model_path: str = "out/r
     if best_model_state is None:
         return
     rbm.load_state_dict(best_model_state)
+    if not os.path.isabs(model_path):
+        rbm_dir = os.path.dirname(os.path.dirname(__file__))
+        model_path = os.path.join(rbm_dir, model_path)
     os.makedirs(os.path.dirname(model_path) or '.', exist_ok=True)
     torch.save(rbm.state_dict(), model_path)
     print(f"Best model saved with MAP@{k}: {best_map:.4f} -> {model_path}")

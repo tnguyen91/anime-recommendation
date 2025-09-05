@@ -1,7 +1,6 @@
-import argparse
 import os
+import argparse
 import numpy as np
-import pandas as pd
 import torch
 import yaml
 
@@ -17,7 +16,8 @@ from src.utils import (
     interactive_recommender
 )
 
-with open(CONFIG_FILE, "r") as f:
+config_path = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
+with open(config_path, "r") as f:
     cfg = yaml.safe_load(f)
 model_cfg = cfg["model"]
 data_cfg = cfg["data"]

@@ -19,12 +19,10 @@ EARLY_STOPPING_PATIENCE = 3
 
 KAGGLE_DATASET = "bsurya27/myanimelists-anime-and-user-anime-interactions"
 
-# Resolve project root (one level up from this file's directory: rbm/ -> project root)
 _RBM_DIR = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(_RBM_DIR, '..'))
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
-# Glob pattern to latest Kaggle dataset version folder
 DATA_VERSIONS_PATH = os.path.join(
     DATA_DIR,
     'datasets',
@@ -36,8 +34,8 @@ DATA_VERSIONS_PATH = os.path.join(
 )
 API_DELAY_SECONDS = 0.5
 
-CONFIG_FILE = "config.yaml"  # inside rbm working directory
-ANIME_METADATA_FILE = os.path.join(DATA_DIR, "anime_metadata.json")  # shared data folder at repo root
+CONFIG_FILE = "config.yaml"
+ANIME_METADATA_FILE = os.path.join(DATA_DIR, "anime_metadata.json") 
 
 DEFAULT_FIGURE_SIZE = (10, 6)
 

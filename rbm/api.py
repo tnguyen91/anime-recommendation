@@ -1,19 +1,17 @@
-"""Flask API for RBM-based anime recommendations (namespaced in rbm/)."""
 import json
 import os
-import pandas as pd
 import torch
 import yaml
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from rbm.constants import (
+from constants import (
     DEFAULT_TOP_N, DEFAULT_API_HOST, DEFAULT_API_PORT,
     HTTP_BAD_REQUEST, ANIME_METADATA_FILE, CONFIG_FILE
 )
-from rbm.src.data_loader import load_anime_dataset
-from rbm.src.model import RBM
-from rbm.src.utils import preprocess_data, get_recommendations
+from src.data_loader import load_anime_dataset
+from src.model import RBM
+from src.utils import preprocess_data, get_recommendations
 
 try:
     with open(ANIME_METADATA_FILE, "r") as f:
@@ -21,11 +19,12 @@ try:
 except Exception:
     anime_metadata = {}
 
-with open(CONFIG_FILE, "r") as f:
+config_path = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
+with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_path = config["paths"]["model_path"]  # out/rbm_best_model.pth relative to rbm working dir
+model_path = config["paths"]["model_path"] 
 
 ratings, anime_df = load_anime_dataset()
 user_anime, _ = preprocess_data(

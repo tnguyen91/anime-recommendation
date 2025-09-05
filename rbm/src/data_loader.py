@@ -6,7 +6,6 @@ import pandas as pd
 from constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
 from src.utils import filter_hentai
 
-# Ensure KaggleHub cache points to the shared data directory (absolute path)
 os.environ.setdefault("KAGGLEHUB_CACHE", DATA_DIR)
 
 
@@ -22,7 +21,6 @@ def _resolve_latest_dataset_version():
 
 
 def load_anime_dataset():
-    # Trigger download (idempotent if already cached)
     kagglehub.dataset_download(KAGGLE_DATASET)
     latest_version = _resolve_latest_dataset_version()
     rating_path = os.path.join(latest_version, "User-AnimeReview.csv")
