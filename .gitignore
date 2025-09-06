@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 env/
 venv/
+.venv/
 datasets/
 *.pth
 *.csv
@@ -22,4 +23,5 @@ Thumbs.db
 
 # Node (Frontend)
 anime-recommender-ui/node_modules/
+anime-recommender-ui/build/
 anime-recommender-ui/.env
