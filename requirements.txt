@@ -4,9 +4,7 @@ torch
 matplotlib
 kagglehub
 seaborn
-flask
-flask-cors
-pyyaml
-requests
-gunicorn
+fastapi
+uvicorn
+pydantic
 redis

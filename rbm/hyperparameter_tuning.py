@@ -7,7 +7,7 @@ import torch
 import yaml
 
 from constants import (
-    HYPERPARAMETER_SEED, HYPERPARAMETER_GRID, HYPERPARAMETER_EPOCHS,
+    SEED, HYPERPARAMETER_GRID, HYPERPARAMETER_EPOCHS,
     DEFAULT_K, CONFIG_FILE
 )
 from src.data_loader import load_anime_dataset
@@ -15,10 +15,10 @@ from src.model import RBM
 from src.train import train_rbm
 from src.utils import preprocess_data, make_train_test_split
 
-random.seed(HYPERPARAMETER_SEED)
-np.random.seed(HYPERPARAMETER_SEED)
-torch.manual_seed(HYPERPARAMETER_SEED)
-torch.cuda.manual_seed_all(HYPERPARAMETER_SEED)
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
 
 with open(CONFIG_FILE, "r") as f:
     config = yaml.safe_load(f)

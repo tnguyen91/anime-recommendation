@@ -3,7 +3,7 @@ import torch
 
 from constants import (
     CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
-    DEFAULT_EPOCHS, DEFAULT_BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
+    EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
 )
 from src.evaluate import evaluate_at_k
 
@@ -67,7 +67,7 @@ def save_best_model(rbm, best_model_state, best_map, k, model_path: str = "out/r
 
 
 def train_rbm(rbm, train_tensor, test_tensor,
-              epochs=DEFAULT_EPOCHS, batch_size=DEFAULT_BATCH_SIZE,
+              epochs=EPOCHS, batch_size=BATCH_SIZE,
               learning_rate=DEFAULT_LEARNING_RATE, k=DEFAULT_K, device='cpu'):
     rbm.to(device)
     train_tensor = train_tensor.to(device)

@@ -4,8 +4,6 @@ from typing import Tuple
 
 
 class RBM(nn.Module):
-    """Restricted Boltzmann Machine for collaborative filtering."""
-
     def __init__(self, n_visible, n_hidden):
         super().__init__()
         self.n_visible = n_visible

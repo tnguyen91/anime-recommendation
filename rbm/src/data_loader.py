@@ -10,7 +10,6 @@ os.environ.setdefault("KAGGLEHUB_CACHE", DATA_DIR)
 
 
 def _resolve_latest_dataset_version():
-    """Return the absolute path to the latest downloaded dataset version folder."""
     candidates = sorted(glob.glob(DATA_VERSIONS_PATH))
     if not candidates:
         raise FileNotFoundError(

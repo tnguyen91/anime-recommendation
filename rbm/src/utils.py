@@ -6,7 +6,7 @@ import torch
 from typing import Tuple
 
 from constants import (
-    DEFAULT_SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
+    SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
     DEFAULT_FIGURE_SIZE
 )
 
@@ -38,7 +38,7 @@ def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
 
     return user_anime, ratings_df
 
-def make_train_test_split(data, holdout_ratio=0.1, seed=DEFAULT_SEED):
+def make_train_test_split(data, holdout_ratio=0.1, seed=SEED):
     np.random.seed(seed)
     train = data.copy()
     test = np.zeros(data.shape)
@@ -133,19 +133,6 @@ def generate_recommendations_csv(rbm, train, test, user_anime, anime,
     return recommendation_df
 
 def search_anime(anime_df, query):
-    """
-    Search for anime by name across multiple title fields.
-    
-    Performs case-insensitive substring search across name, English title,
-    and Japanese title fields to find matching anime entries.
-    
-    Args:
-        anime_df (pd.DataFrame): Anime metadata dataframe
-        query (str): Search query string
-        
-    Returns:
-        pd.DataFrame: Matching anime with ID and title columns
-    """
     name_cols = ["name", "title_english", "title_japanese"]
     mask = False
     for col in name_cols:
@@ -154,19 +141,6 @@ def search_anime(anime_df, query):
     return matches[["anime_id"] + name_cols]
 
 def make_input_vector(liked_anime_ids, anime_ids):
-    """
-    Create binary input vector from user's liked anime IDs.
-    
-    Converts a list of liked anime IDs into a binary vector compatible
-    with the RBM model, where 1 indicates the user liked that anime.
-    
-    Args:
-        liked_anime_ids (list): List of anime IDs the user has liked
-        anime_ids (list): Complete list of anime IDs in the model
-        
-    Returns:
-        np.ndarray: Binary vector of length len(anime_ids)
-    """
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def plot_training_metrics(losses, precs, maps, ndcgs, K):
