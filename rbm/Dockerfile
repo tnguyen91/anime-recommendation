@@ -5,4 +5,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 WORKDIR /app/rbm
 EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "rbm.api:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "api:app"]

@@ -4,6 +4,7 @@ import torch
 import yaml
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import redis
 
 from constants import (
     DEFAULT_TOP_N, DEFAULT_API_HOST, DEFAULT_API_PORT,
@@ -38,6 +39,8 @@ if os.path.exists(model_path):
     rbm.load_state_dict(torch.load(model_path, map_location=device))
 rbm.eval()
 
+redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
+
 app = Flask(__name__)
 CORS(app)
 
@@ -51,6 +54,16 @@ def recommend():
     matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
     if not matched_ids:
         return jsonify({"error": "No matching anime found"}), HTTP_BAD_REQUEST
+    
+    # Create a unique cache key from the sorted liked anime IDs
+    cache_key = f"rec:{','.join(map(str, sorted(matched_ids)))}"
+    
+    # Check if recommendations are cached
+    cached_result = redis_client.get(cache_key)
+    if cached_result:
+        return jsonify(json.loads(cached_result))
+    
+    # If not cached, compute recommendations
     input_vec = torch.FloatTensor([[1 if a in matched_ids else 0 for a in anime_ids]]).to(device)
     recs = get_recommendations(input_vec.squeeze(0), rbm, anime_ids, anime_df, top_n=DEFAULT_TOP_N, device=device)
     response = []
@@ -63,6 +76,10 @@ def recommend():
             "genre": info.get("genres", []),
             "synopsis": info.get("synopsis", "")
         })
+    
+    # Cache the result for 1 hour (3600 seconds)
+    redis_client.setex(cache_key, 3600, json.dumps({"recommendations": response}))
+    
     return jsonify({"recommendations": response})
 
 

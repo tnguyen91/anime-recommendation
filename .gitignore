@@ -1,4 +1,3 @@
-# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -10,18 +9,19 @@ datasets/
 *.pth
 *.csv
 .env
-# Jupyter
 .ipynb_checkpoints
 
-# IDEs
 .idea/
 .vscode/
 
-# OS
 .DS_Store
 Thumbs.db
 
-# Node (Frontend)
 anime-recommender-ui/node_modules/
 anime-recommender-ui/build/
 anime-recommender-ui/.env
+
+data/
+out/
+rbm/out/
+rbm/hyperparameter_tuning.py
