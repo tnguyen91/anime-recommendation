@@ -6,7 +6,7 @@ import yaml
 
 from constants import (
     SEED, N_HIDDEN, EPOCHS, BATCH_SIZE,
-    DEFAULT_LEARNING_RATE, DEFAULT_K, DEFAULT_TOP_N, CONFIG_FILE
+    DEFAULT_LEARNING_RATE, DEFAULT_K, TOP_N, CONFIG_FILE
 )
 from src.data_loader import load_anime_dataset
 from src.model import RBM
@@ -76,8 +76,7 @@ def main(train_model=True, run_cli=True, n_hidden=N_HIDDEN, epochs=EPOCHS,
             print(f"Model path not found: {model_path}")
             return
     if run_cli:
-        interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N)
-
+        interactive_recommender(user_anime, anime, rbm, device, top_n=TOP_N)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RBM Anime Recommender")

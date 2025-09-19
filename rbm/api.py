@@ -50,23 +50,34 @@ with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_path = config["paths"]["model_path"] 
+model_path = config["paths"]["model_path"]
 
-ratings, anime_df = load_anime_dataset()
-user_anime, _ = preprocess_data(
-    ratings,
-    min_likes_user=config["data"]["min_likes_user"],
-    min_likes_anime=config["data"]["min_likes_anime"]
-)
-anime_ids = list(user_anime.columns)
-rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
-if os.path.exists(model_path):
-    rbm.load_state_dict(torch.load(model_path, map_location=device))
-rbm.eval()
+ratings = None
+anime_df = None
+user_anime = None
+anime_ids = None
+rbm = None
+redis_client = None
 
-redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
+app = FastAPI(title="Anime Recommendation API")
 
-app = FastAPI(title="Anime Recommendation API", version="1.0.0")
+@app.on_event("startup")
+async def startup_event():
+    global ratings, anime_df, user_anime, anime_ids, rbm, redis_client
+    
+    ratings, anime_df = load_anime_dataset()
+    user_anime, _ = preprocess_data(
+        ratings,
+        min_likes_user=config["data"]["min_likes_user"],
+        min_likes_anime=config["data"]["min_likes_anime"]
+    )
+    anime_ids = list(user_anime.columns)
+    rbm = RBM(n_visible=len(anime_ids), n_hidden=config["model"]["n_hidden"]).to(device)
+    if os.path.exists(model_path):
+        rbm.load_state_dict(torch.load(model_path, map_location=device))
+    rbm.eval()
+    
+    redis_client = redis.Redis(host='redis', port=6379, decode_responses=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +87,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 @app.post("/recommend", response_model=RecommendResponse)
 async def recommend(request: RecommendRequest):
@@ -108,9 +122,7 @@ async def recommend(request: RecommendRequest):
     
     result = RecommendResponse(recommendations=response)
     redis_client.setex(cache_key, 3600, result.json())
-    
     return result
-
 
 @app.get("/search-anime", response_model=SearchResponse)
 async def search_anime(query: str):
@@ -138,10 +150,6 @@ async def search_anime(query: str):
             synopsis=info.get("synopsis")
         ))
     return SearchResponse(results=results)
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
