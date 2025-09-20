@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from typing import Tuple
 
-from constants import (
+from ..constants import (
     SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
     DEFAULT_FIGURE_SIZE
 )

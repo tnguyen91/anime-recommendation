@@ -3,11 +3,10 @@ import os
 import kagglehub
 import pandas as pd
 
-from constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
-from src.utils import filter_hentai
+from ..constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
+from .utils import filter_hentai
 
 os.environ.setdefault("KAGGLEHUB_CACHE", DATA_DIR)
-
 
 def _resolve_latest_dataset_version():
     candidates = sorted(glob.glob(DATA_VERSIONS_PATH))

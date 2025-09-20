@@ -1,11 +1,11 @@
 import os
 import torch
 
-from constants import (
+from ..constants import (
     CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
     EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
 )
-from src.evaluate import evaluate_at_k
+from .evaluate import evaluate_at_k
 
 
 def train_single_batch(rbm, optimizer, batch):
