@@ -1,10 +1,22 @@
 import os
 import torch
 
-from ..constants import (
-    CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
-    EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
-)
+try:
+    from ..constants import (
+        CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
+        EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
+    )
+except ImportError:
+    import os
+    import sys
+    _CURRENT_DIR = os.path.dirname(__file__)
+    _PROJECT_ROOT = os.path.dirname(os.path.dirname(_CURRENT_DIR))
+    if _PROJECT_ROOT not in sys.path:
+        sys.path.append(_PROJECT_ROOT)
+    from constants import (
+        CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
+        EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
+    )
 from .evaluate import evaluate_at_k
 
 

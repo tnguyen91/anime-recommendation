@@ -5,10 +5,22 @@ import pandas as pd
 import torch
 from typing import Tuple
 
-from ..constants import (
-    SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
-    DEFAULT_FIGURE_SIZE
-)
+try:
+    from ..constants import (
+        SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
+        DEFAULT_FIGURE_SIZE
+    )
+except ImportError:
+    import os
+    import sys
+    _CURRENT_DIR = os.path.dirname(__file__)
+    _PROJECT_ROOT = os.path.dirname(os.path.dirname(_CURRENT_DIR))
+    if _PROJECT_ROOT not in sys.path:
+        sys.path.append(_PROJECT_ROOT)
+    from constants import (
+        SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
+        DEFAULT_FIGURE_SIZE
+    )
 
 def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)

@@ -3,7 +3,16 @@ import os
 import kagglehub
 import pandas as pd
 
-from ..constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
+try:
+    from ..constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
+except ImportError:  # Fallback when package context is unavailable
+    import os
+    import sys
+    _CURRENT_DIR = os.path.dirname(__file__)
+    _PROJECT_ROOT = os.path.dirname(os.path.dirname(_CURRENT_DIR))
+    if _PROJECT_ROOT not in sys.path:
+        sys.path.append(_PROJECT_ROOT)
+    from constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
 from .utils import filter_hentai
 
 os.environ.setdefault("KAGGLEHUB_CACHE", DATA_DIR)
