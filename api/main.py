@@ -1,5 +1,7 @@
 import json
 import os
+from pathlib import Path
+
 import pandas as pd
 import torch
 import uvicorn
@@ -8,12 +10,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from constants import (
-    DEFAULT_TOP_N, ANIME_METADATA_FILE, CONFIG_FILE, HTTP_BAD_REQUEST
+from rbm.constants import (
+    CONFIG_FILE,
+    DEFAULT_TOP_N,
+    HTTP_BAD_REQUEST,
+    ANIME_METADATA_FILE,
 )
-from src.data_loader import load_anime_dataset
-from src.model import RBM
-from src.utils import preprocess_data, get_recommendations
+from rbm.src.data_loader import load_anime_dataset
+from rbm.src.model import RBM
+from rbm.src.utils import preprocess_data, get_recommendations
+from contextlib import asynccontextmanager
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -40,19 +46,23 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
 
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
+RBM_DIR = PROJECT_ROOT / "rbm"
+
 try:
     with open(ANIME_METADATA_FILE, "r") as f:
         anime_metadata = json.load(f)
 except Exception:
     anime_metadata = {}
 
-config_path = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
-with open(config_path, "r") as f:
+config_path = RBM_DIR / CONFIG_FILE
+with open(config_path, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-model_cfg = config['model']
-data_cfg = config['data']
-path_cfg = config['paths']
+model_cfg = config["model"]
+data_cfg = config["data"]
+path_cfg = config["paths"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -61,8 +71,6 @@ anime_df = None
 user_anime = None
 anime_ids = None
 rbm = None
-
-from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -77,9 +85,10 @@ async def lifespan(app: FastAPI):
     )
     anime_ids = list(user_anime.columns)
 
-    rbm = RBM(n_visible=len(anime_ids), n_hidden=model_cfg['n_hidden']).to(device)
-    if os.path.exists(path_cfg['model_path']):
-        rbm.load_state_dict(torch.load(path_cfg['model_path'], map_location=device))
+    rbm = RBM(n_visible=len(anime_ids), n_hidden=model_cfg["n_hidden"]).to(device)
+    model_path = (RBM_DIR / path_cfg["model_path"]).resolve()
+    if model_path.exists():
+        rbm.load_state_dict(torch.load(model_path, map_location=device))
 
     yield
 
@@ -163,8 +172,8 @@ async def recommend(request: RecommendRequest):
         raise HTTPException(status_code=500, detail="Internal server error while generating recommendations")
 
 @app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
-async def search_anime(query: str):
-    query = query.strip()
+async def search_anime(query: str = ""):
+    query = (query or "").strip()
 
     if not query:
         return SearchResponse(results=[])
@@ -204,8 +213,8 @@ async def search_anime(query: str):
 
 if __name__ == "__main__":
     uvicorn.run(
-        "api:app",
+        "api.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=True,
     )

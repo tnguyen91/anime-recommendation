@@ -2,11 +2,9 @@ services:
   backend:
     build:
       context: .
-      dockerfile: rbm/Dockerfile
+      dockerfile: api/Dockerfile
     ports:
       - "5000:5000"
-    environment:
-      - FLASK_ENV=production
     networks:
       - app-network
     volumes:
