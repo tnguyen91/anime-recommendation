@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,12 @@ import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from rbm.constants import (
     CONFIG_FILE,
@@ -19,7 +26,6 @@ from rbm.constants import (
 from rbm.src.data_loader import load_anime_dataset
 from rbm.src.model import RBM
 from rbm.src.utils import preprocess_data, get_recommendations
-from contextlib import asynccontextmanager
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -46,8 +52,6 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
 
-BASE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BASE_DIR.parent
 RBM_DIR = PROJECT_ROOT / "rbm"
 
 try:

@@ -4,20 +4,20 @@ services:
       context: .
       dockerfile: api/Dockerfile
     ports:
-      - "5000:5000"
+      - "8000:8000"
     networks:
       - app-network
     volumes:
-      - ./data:/app/data  # Persist data downloads
+      - ./data:/app/data 
 
   frontend:
     build: ./anime-recommender-ui
     ports:
-      - "80:80"
+      - "3000:3000"
     depends_on:
       - backend
     environment:
-      - REACT_APP_API_URL=http://backend:5000
+      - NEXT_PUBLIC_API_URL=http://backend:8000
     networks:
       - app-network
 

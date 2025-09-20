@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 
 try:
@@ -7,8 +8,6 @@ try:
         EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
     )
 except ImportError:
-    import os
-    import sys
     _CURRENT_DIR = os.path.dirname(__file__)
     _PROJECT_ROOT = os.path.dirname(os.path.dirname(_CURRENT_DIR))
     if _PROJECT_ROOT not in sys.path:

@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 import pandas as pd
 import torch
 from typing import Tuple
@@ -11,8 +12,6 @@ try:
         DEFAULT_FIGURE_SIZE
     )
 except ImportError:
-    import os
-    import sys
     _CURRENT_DIR = os.path.dirname(__file__)
     _PROJECT_ROOT = os.path.dirname(os.path.dirname(_CURRENT_DIR))
     if _PROJECT_ROOT not in sys.path:

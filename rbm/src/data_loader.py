@@ -1,13 +1,12 @@
 import glob
 import os
+import sys
 import kagglehub
 import pandas as pd
 
 try:
     from ..constants import KAGGLE_DATASET, DATA_VERSIONS_PATH, DATA_DIR
-except ImportError:  # Fallback when package context is unavailable
-    import os
-    import sys
+except ImportError: 
     _CURRENT_DIR = os.path.dirname(__file__)
     _PROJECT_ROOT = os.path.dirname(os.path.dirname(_CURRENT_DIR))
     if _PROJECT_ROOT not in sys.path:

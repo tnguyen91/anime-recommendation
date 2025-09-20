@@ -1,4 +1,5 @@
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 *.pyd
@@ -19,6 +20,7 @@ Thumbs.db
 
 anime-recommender-ui/node_modules/
 anime-recommender-ui/build/
+anime-recommender-ui/.next/
 anime-recommender-ui/.env
 
 data/
