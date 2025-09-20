@@ -6,7 +6,7 @@ import yaml
 
 from constants import (
     SEED, N_HIDDEN, EPOCHS, BATCH_SIZE,
-    DEFAULT_LEARNING_RATE, DEFAULT_K, DEFAULT_TOP_N, CONFIG_FILE
+    DEFAULT_LEARNING_RATE, DEFAULT_K, DEFAULT_TOP_N, CONFIG_FILE, OUTPUT_DIR
 )
 from src.data_loader import load_anime_dataset
 from src.model import RBM
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument('--learning-rate', type=float, default=DEFAULT_LEARNING_RATE)
     parser.add_argument('--n-hidden', type=int, default=N_HIDDEN)
     parser.add_argument('--k', type=int, default=DEFAULT_K)
-    parser.add_argument('--model-path', type=str, default='out/rbm_best_model.pth')
+    parser.add_argument('--model-path', type=str, default=os.path.join(OUTPUT_DIR, 'rbm_best_model.pth'))
     args = parser.parse_args()
     main(
         train_model=args.train,

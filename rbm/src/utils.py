@@ -9,7 +9,7 @@ from typing import Tuple
 try:
     from ..constants import (
         SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
-        DEFAULT_FIGURE_SIZE
+        DEFAULT_FIGURE_SIZE, OUTPUT_DIR
     )
 except ImportError:
     _CURRENT_DIR = os.path.dirname(__file__)
@@ -18,7 +18,7 @@ except ImportError:
         sys.path.append(_PROJECT_ROOT)
     from constants import (
         SEED, RATING_THRESHOLD, DEFAULT_TOP_N,
-        DEFAULT_FIGURE_SIZE
+        DEFAULT_FIGURE_SIZE, OUTPUT_DIR
     )
 
 def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -124,7 +124,7 @@ def process_user_recommendations(user_id, user_scores, anime_ids, anime_df, test
     return user_recommendations
 
 def generate_recommendations_csv(rbm, train, test, user_anime, anime,
-                                 device='cpu', top_n=DEFAULT_TOP_N, filename="out/recommendations.csv"):
+                                 device='cpu', top_n=DEFAULT_TOP_N, filename: str | None = None):
     user_ids = list(user_anime.index)
     anime_ids = list(user_anime.columns)
     input_tensor = torch.FloatTensor(train.values).to(device)
@@ -139,6 +139,11 @@ def generate_recommendations_csv(rbm, train, test, user_anime, anime,
         recommendation_rows.extend(user_recs)
 
     recommendation_df = pd.DataFrame(recommendation_rows)
+    if filename is None:
+        filename = os.path.join(OUTPUT_DIR, "recommendations.csv")
+    elif not os.path.isabs(filename):
+        filename = os.path.join(OUTPUT_DIR, os.path.basename(filename))
+    os.makedirs(os.path.dirname(filename) or OUTPUT_DIR, exist_ok=True)
     recommendation_df.to_csv(filename, index=False)
     print(f"Recommendations saved to {filename}")
     return recommendation_df
@@ -165,9 +170,8 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.title("RBM Training Metrics")
     plt.legend()
     plt.grid(True)
-    rbm_dir = os.path.dirname(os.path.dirname(__file__)) 
-    output_path = os.path.join(rbm_dir, "out/training_metrics.png")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_path = os.path.join(OUTPUT_DIR, "training_metrics.png")
+    os.makedirs(os.path.dirname(output_path) or OUTPUT_DIR, exist_ok=True)
     plt.savefig(output_path)
     plt.show()
 

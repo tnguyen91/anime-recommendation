@@ -5,7 +5,7 @@ import torch
 try:
     from ..constants import (
         CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
-        EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
+        EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K, OUTPUT_DIR
     )
 except ImportError:
     _CURRENT_DIR = os.path.dirname(__file__)
@@ -14,7 +14,7 @@ except ImportError:
         sys.path.append(_PROJECT_ROOT)
     from constants import (
         CLAMP_MIN, CLAMP_MAX, WEIGHT_DECAY, EARLY_STOPPING_PATIENCE,
-        EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K
+        EPOCHS, BATCH_SIZE, DEFAULT_LEARNING_RATE, DEFAULT_K, OUTPUT_DIR
     )
 from .evaluate import evaluate_at_k
 
@@ -65,14 +65,15 @@ def check_early_stopping(mean_ap, best_map, patience_counter, patience, rbm):
     return best_map, patience_counter, should_stop, best_model_state
 
 
-def save_best_model(rbm, best_model_state, best_map, k, model_path: str = "out/rbm_best_model.pth"):
+def save_best_model(rbm, best_model_state, best_map, k, model_path: str | None = None):
     if best_model_state is None:
         return
     rbm.load_state_dict(best_model_state)
-    if not os.path.isabs(model_path):
-        rbm_dir = os.path.dirname(os.path.dirname(__file__))
-        model_path = os.path.join(rbm_dir, model_path)
-    os.makedirs(os.path.dirname(model_path) or '.', exist_ok=True)
+    if model_path is None:
+        model_path = os.path.join(OUTPUT_DIR, "rbm_best_model.pth")
+    elif not os.path.isabs(model_path):
+        model_path = os.path.join(OUTPUT_DIR, os.path.basename(model_path))
+    os.makedirs(os.path.dirname(model_path) or OUTPUT_DIR, exist_ok=True)
     torch.save(rbm.state_dict(), model_path)
     print(f"Best model saved with MAP@{k}: {best_map:.4f} -> {model_path}")
 

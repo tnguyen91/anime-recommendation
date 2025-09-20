@@ -15,6 +15,7 @@ KAGGLE_DATASET = "bsurya27/myanimelists-anime-and-user-anime-interactions"
 _RBM_DIR = os.path.abspath(os.path.dirname(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(_RBM_DIR, '..'))
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "out")
 
 DATA_VERSIONS_PATH = os.path.join(
     DATA_DIR,
