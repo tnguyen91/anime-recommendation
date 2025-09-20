@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -199,15 +198,25 @@ async def search_anime(query: str = ""):
         matches = matches[cols].drop_duplicates()
         results = []
         for _, row in matches.iterrows():
-            info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"])) or {}
+            raw_id = row.get("anime_id")
+            if pd.isnull(raw_id):
+                continue
+
+            try:
+                normalized_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+
+            metadata_info = anime_metadata.get(str(normalized_id)) or anime_metadata.get(normalized_id, {})
+
             results.append(SearchResult(
-                anime_id=int(row["anime_id"]),
-                name=row.get("name", ""),
-                title_english=row.get("title_english") or "",
-                title_japanese=row.get("title_japanese") or "",
-                image_url=info.get("image_url"),
-                genre=info.get("genres", []),
-                synopsis=info.get("synopsis")
+                anime_id=normalized_id,
+                name="" if pd.isnull(row.get("name")) else row.get("name", ""),
+                title_english="" if pd.isnull(row.get("title_english")) else row.get("title_english", ""),
+                title_japanese="" if pd.isnull(row.get("title_japanese")) else row.get("title_japanese", ""),
+                image_url=metadata_info.get("image_url"),
+                genre=metadata_info.get("genres", []),
+                synopsis=metadata_info.get("synopsis")
             ))
 
         return SearchResponse(results=results)

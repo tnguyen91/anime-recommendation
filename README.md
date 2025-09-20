@@ -1,6 +1,6 @@
 # Anime Recommendation System using Restricted Boltzmann Machines
 
-A machine learning-based anime recommendation system that leverages **Restricted Boltzmann Machines (RBM)** for collaborative filtering. The system provides personalized anime recommendations and includes a full-stack web application with React frontend and Flask API backend.
+A machine learning-based anime recommendation system that leverages **Restricted Boltzmann Machines (RBM)** for collaborative filtering. The system provides personalized anime recommendations and includes a full-stack web application with React frontend and FastAPI backend.
 
 ## Features
 
@@ -8,7 +8,7 @@ A machine learning-based anime recommendation system that leverages **Restricted
 - **GPU Acceleration**: Automatic CUDA detection and utilization for training
 - **Comprehensive Evaluation**: Precision@K, MAP@K, and NDCG@K metrics
 - **Web Interface**: Modern React frontend with search and recommendation features
-- **REST API**: Flask backend with comprehensive error handling and validation
+- **REST API**: FastAPI backend with comprehensive error handling and validation
 - **Production Ready**: Docker containerization and Docker Compose orchestration
 - **Hyperparameter Tuning**: Automated grid search with CSV result logging
 - **Data Visualization**: Training metrics plots and recommendation exports
@@ -18,7 +18,7 @@ A machine learning-based anime recommendation system that leverages **Restricted
 **Backend & ML:**
 - Python 3.12
 - PyTorch (RBM implementation)
-- Flask (REST API)
+- FastAPI (REST API)
 - pandas, NumPy (data processing)
 - Gunicorn (production WSGI server)
 
@@ -65,9 +65,11 @@ anime-recommendation/
 │   └── anime_metadata.json
 ├── anime-recommender-ui/        # React frontend
 │   └── ...
-├── rbm/                        # RBM implementation
+├── api/                        # FastAPI application layer
 │   ├── Dockerfile
-│   ├── api.py
+│   ├── __init__.py
+│   └── main.py
+├── rbm/                        # RBM implementation
 │   ├── main.py
 │   ├── hyperparameter_tuning.py
 │   ├── build_metadata_cache.py
@@ -108,38 +110,38 @@ npm install
 ```
 ### 5. (Optional) Train the model
 ```bash
-python main.py --train
+python rbm/main.py --train
 ```
 ### 6. (Optional) Hyperparameter tuning
 ```bash
-python hyperparameter_tuning.py
+python rbm/hyperparameter_tuning.py
 ```
 
 ---
 
 ## Quickstart (with Docker)
 
-Run backend (Flask API) and frontend (React UI) together using Docker Compose:
+Run backend (FastAPI) and frontend (React UI) together using Docker Compose:
 
 ```bash
 docker-compose up --build
 ```
 
-  - Frontend: http://localhost
+  - Frontend: http://localhost:3000
   - API: http://localhost:5000
 
 ---
 
 ## Running Locally
 
-### Start backend (Flask API):
+### Start backend (FastAPI):
 ```bash
-python api.py
+python -m api.main
 ```
-### Start frontend (React UI) in a new terminal:
+### Start frontend (Next.js UI) in a new terminal:
 ```bash
 cd anime-recommender-ui
-npm start
+npm run dev
 ```
 
 ---
@@ -181,11 +183,11 @@ The frontend expects a `.env` file in the `anime-recommender-ui/` directory.
 
     - For Docker Compose:
       ```env
-      REACT_APP_API_URL=http://backend:5000
+      NEXT_PUBLIC_API_URL=http://backend:5000
       ```
     - For local development:
       ```env
-      REACT_APP_API_URL=http://localhost:5000
+      NEXT_PUBLIC_API_URL=http://localhost:5000
       ```
 
 ---
