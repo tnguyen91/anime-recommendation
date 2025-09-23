@@ -2,6 +2,10 @@ import json
 import os
 from pathlib import Path
 from urllib.parse import urlparse
+import hashlib
+import time
+import urllib.request
+import urllib.error
 from typing import Any
 import pandas as pd
 import torch
@@ -65,27 +69,9 @@ anime_metadata: dict[str, Any] = {}
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def _resolve_resource(uri: str | None, default_path: Path) -> Path:
-    """
-    Resolve a resource URI to a local Path.
-
-    Supported inputs:
-    - None -> use default_path
-    - local filesystem path (absolute or relative to project root)
-    - http(s) URLs (not downloaded automatically; raise instructive error)
-
-    S3 (s3://) and other cloud-specific schemes are intentionally not supported here.
-    If you previously relied on S3, upload the files into the project `data/` folder or
-    provide a local path via environment variables.
-    """
-
     if uri:
-        # Reject cloud-specific URIs on purpose to keep repo AWS-free
-        if uri.startswith("s3://"):
-            raise ValueError("S3 URIs are not supported in this workspace. Please provide a local path to the model and metadata.")
-
-        # http(s) handled explicitly but not downloaded automatically
         if uri.startswith("http://") or uri.startswith("https://"):
-            raise ValueError("HTTP URIs are not automatically downloaded. Please provide a local file path or add download logic in your deployment step.")
+            return _download_to_cache(uri)
 
         candidate = Path(uri)
         path = candidate if candidate.is_absolute() else (PROJECT_ROOT / candidate).resolve()
@@ -97,6 +83,46 @@ def _resolve_resource(uri: str | None, default_path: Path) -> Path:
         raise FileNotFoundError(f"Resource not found at {path}. Provide a valid local path.")
 
     return path
+
+def _download_to_cache(url: str, max_retries: int = 3, timeout: int = 30) -> Path:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    parsed = urlparse(url)
+    suffix = Path(parsed.path).suffix or ""
+    local_name = f"{url_hash}{suffix}"
+    local_path = CACHE_DIR / local_name
+    if local_path.exists():
+        return local_path
+
+    tmp_path = CACHE_DIR / (local_name + ".tmp")
+
+    attempt = 0
+    while attempt < max_retries:
+        attempt += 1
+        try:
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                with tmp_path.open("wb") as f:
+                    chunk_size = 1024 * 64
+                    while True:
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+
+            tmp_path.replace(local_path)
+            return local_path
+
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:
+                raise
+            last_exc = e
+        except Exception as e:
+            last_exc = e
+
+        time.sleep(2 ** attempt)
+
+    raise last_exc
 
 ratings = None
 anime_df = None

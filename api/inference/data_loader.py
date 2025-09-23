@@ -33,7 +33,13 @@ def _download_dataset() -> None:
 
 
 def load_anime_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
-    _download_dataset()
+    candidates = sorted(glob.glob(DATA_VERSIONS_PATH))
+    if not candidates:
+        try:
+            _download_dataset()
+        except Exception:
+            pass
+
     latest_version = _resolve_latest_dataset_version()
     latest_path = Path(latest_version)
     rating_path = latest_path / "User-AnimeReview.csv"

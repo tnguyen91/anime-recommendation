@@ -7,8 +7,13 @@ services:
       - "8000:8000"
     networks:
       - app-network
+    environment:
+      - MODEL_URI=${MODEL_URI}
+      - METADATA_URI=${METADATA_URI}
+      - CACHE_DIR=/app/cache
     volumes:
-      - ./data:/app/data 
+      - ./data:/app/data
+      - ./cache:/app/cache
 
   frontend:
     build: ./anime-recommender-ui
