@@ -1,11 +1,11 @@
 import json
-import sys
+import os
 from pathlib import Path
-
+from urllib.parse import urlparse
+from typing import Any
 import pandas as pd
 import torch
 import uvicorn
-import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,18 +13,22 @@ from contextlib import asynccontextmanager
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
-from rbm.constants import (
-    CONFIG_FILE,
+from api.config import (
     DEFAULT_TOP_N,
     HTTP_BAD_REQUEST,
-    ANIME_METADATA_FILE,
+    HTTP_INTERNAL_ERROR,
+    DEFAULT_MODEL_PATH,
+    DEFAULT_METADATA_PATH,
+    CACHE_DIR_DEFAULT,
+    MIN_LIKES_USER,
+    MIN_LIKES_ANIME,
+    N_HIDDEN,
 )
-from rbm.src.data_loader import load_anime_dataset
-from rbm.src.model import RBM
-from rbm.src.utils import preprocess_data, get_recommendations
+from api.inference.data_loader import load_anime_dataset
+from api.inference.model import RBM
+from api.inference.preprocess import preprocess_data
+from api.inference.recommender import get_recommendations
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -51,23 +55,48 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
 
-RBM_DIR = PROJECT_ROOT / "rbm"
+CACHE_DIR = Path(os.getenv("CACHE_DIR", str(CACHE_DIR_DEFAULT))).resolve()
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_URI = os.getenv("MODEL_URI")
+METADATA_URI = os.getenv("METADATA_URI")
 
-try:
-    with open(ANIME_METADATA_FILE, "r") as f:
-        anime_metadata = json.load(f)
-except Exception:
-    anime_metadata = {}
-
-config_path = RBM_DIR / CONFIG_FILE
-with open(config_path, "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
-
-model_cfg = config["model"]
-data_cfg = config["data"]
-path_cfg = config["paths"]
+anime_metadata: dict[str, Any] = {}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def _resolve_resource(uri: str | None, default_path: Path) -> Path:
+    """
+    Resolve a resource URI to a local Path.
+
+    Supported inputs:
+    - None -> use default_path
+    - local filesystem path (absolute or relative to project root)
+    - http(s) URLs (not downloaded automatically; raise instructive error)
+
+    S3 (s3://) and other cloud-specific schemes are intentionally not supported here.
+    If you previously relied on S3, upload the files into the project `data/` folder or
+    provide a local path via environment variables.
+    """
+
+    if uri:
+        # Reject cloud-specific URIs on purpose to keep repo AWS-free
+        if uri.startswith("s3://"):
+            raise ValueError("S3 URIs are not supported in this workspace. Please provide a local path to the model and metadata.")
+
+        # http(s) handled explicitly but not downloaded automatically
+        if uri.startswith("http://") or uri.startswith("https://"):
+            raise ValueError("HTTP URIs are not automatically downloaded. Please provide a local file path or add download logic in your deployment step.")
+
+        candidate = Path(uri)
+        path = candidate if candidate.is_absolute() else (PROJECT_ROOT / candidate).resolve()
+    else:
+        path = default_path
+
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Resource not found at {path}. Provide a valid local path.")
+
+    return path
 
 ratings = None
 anime_df = None
@@ -77,21 +106,28 @@ rbm = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ratings, anime_df, user_anime, anime_ids, rbm
+    global ratings, anime_df, user_anime, anime_ids, rbm, anime_metadata
 
     ratings, anime_df = load_anime_dataset()
 
     user_anime, _ = preprocess_data(
         ratings,
-        min_likes_user=data_cfg["min_likes_user"],
-        min_likes_anime=data_cfg["min_likes_anime"]
+        min_likes_user=MIN_LIKES_USER,
+        min_likes_anime=MIN_LIKES_ANIME
     )
     anime_ids = list(user_anime.columns)
 
-    rbm = RBM(n_visible=len(anime_ids), n_hidden=model_cfg["n_hidden"]).to(device)
-    model_path = (RBM_DIR / path_cfg["model_path"]).resolve()
+    rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device)
+
+    model_path = _resolve_resource(MODEL_URI, DEFAULT_MODEL_PATH)
     if model_path.exists():
         rbm.load_state_dict(torch.load(model_path, map_location=device))
+
+    metadata_path = _resolve_resource(METADATA_URI, DEFAULT_METADATA_PATH)
+    if metadata_path.exists():
+        global anime_metadata
+        with metadata_path.open("r", encoding="utf-8") as f:
+            anime_metadata = json.load(f)
 
     yield
 
@@ -172,7 +208,7 @@ async def recommend(request: RecommendRequest):
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error while generating recommendations")
+        raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
 
 @app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
 async def search_anime(query: str = ""):
@@ -222,7 +258,7 @@ async def search_anime(query: str = ""):
         return SearchResponse(results=results)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error while searching anime")
+        raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while searching anime")
 
 if __name__ == "__main__":
     uvicorn.run(

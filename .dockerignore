@@ -2,23 +2,23 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.so
+*.whl
 venv/
-
-node_modules/
-npm-debug.log
-build/
 
 .env
 .env.*
 
-*.csv
-*.pth
-*.json
-!data/anime_metadata.json
-
 .git
 .gitignore
-.ipynb_checkpoints
-.vscode
+.ipynb_checkpoints/
+.pytest_cache/
 
+out/
+requirements-train.txt
+data_analysis.ipynb
+taskdef.json
+
+rbm/
 anime-recommender-ui/
+data/

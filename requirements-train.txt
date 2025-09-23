@@ -1,0 +1,9 @@
+pandas==2.3.2
+numpy==2.3.3
+torch==2.8.0
+torchvision==0.23.0
+matplotlib==3.10.6
+seaborn==0.13.2
+kagglehub==0.3.13
+pytest==8.3.3
+
