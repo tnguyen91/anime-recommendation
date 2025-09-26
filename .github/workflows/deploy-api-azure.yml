@@ -1,0 +1,38 @@
+name: Deploy API to Azure Web App (using publish profile)
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy image using publish profile
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: anime-recommendation-api
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          images: 'tnguyen7824/anime-recommendation-backend:latest'
+
+      - name: Restart web app (best-effort)
+        run: |
+          # Use curl to call Kudu API to restart (publish profile has FTP/MSDeploy creds) OR use simple HTTP ping via the site's restart endpoint
+          # We will attempt a simple warmup by requesting /health after a short wait.
+          sleep 5
+          HOSTNAME="anime-recommendation-api.azurewebsites.net"
+          for i in {1..20}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "https://$HOSTNAME/health" || echo "000")
+            echo "Health status: $status"
+            if [ "$status" = "200" ]; then
+              echo "Service healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check did not become healthy"
+          exit 1
