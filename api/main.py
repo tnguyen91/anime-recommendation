@@ -1,11 +1,6 @@
 import json
 import os
 from pathlib import Path
-from urllib.parse import urlparse
-import hashlib
-import time
-import urllib.request
-import urllib.error
 from typing import Any
 import pandas as pd
 import torch
@@ -15,21 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
-BASE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BASE_DIR.parent
-
 from api.config import (
     DEFAULT_TOP_N,
     HTTP_BAD_REQUEST,
     HTTP_INTERNAL_ERROR,
-    DEFAULT_MODEL_PATH,
-    DEFAULT_METADATA_PATH,
-    CACHE_DIR_DEFAULT,
     MIN_LIKES_USER,
     MIN_LIKES_ANIME,
     N_HIDDEN,
 )
 from api.inference.data_loader import load_anime_dataset
+from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
 from api.inference.preprocess import preprocess_data
 from api.inference.recommender import get_recommendations
@@ -59,7 +49,10 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
 
-CACHE_DIR = Path(os.getenv("CACHE_DIR", str(CACHE_DIR_DEFAULT))).resolve()
+cache_env = os.getenv("CACHE_DIR")
+if not cache_env:
+    raise EnvironmentError("CACHE_DIR environment variable must be set to a valid directory path.")
+CACHE_DIR = Path(cache_env).resolve()
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 MODEL_URI = os.getenv("MODEL_URI")
 METADATA_URI = os.getenv("METADATA_URI")
@@ -67,62 +60,6 @@ METADATA_URI = os.getenv("METADATA_URI")
 anime_metadata: dict[str, Any] = {}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-def _resolve_resource(uri: str | None, default_path: Path) -> Path:
-    if uri:
-        if uri.startswith("http://") or uri.startswith("https://"):
-            return _download_to_cache(uri)
-
-        candidate = Path(uri)
-        path = candidate if candidate.is_absolute() else (PROJECT_ROOT / candidate).resolve()
-    else:
-        path = default_path
-
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Resource not found at {path}. Provide a valid local path.")
-
-    return path
-
-def _download_to_cache(url: str, max_retries: int = 3, timeout: int = 30) -> Path:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    url_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
-    parsed = urlparse(url)
-    suffix = Path(parsed.path).suffix or ""
-    local_name = f"{url_hash}{suffix}"
-    local_path = CACHE_DIR / local_name
-    if local_path.exists():
-        return local_path
-
-    tmp_path = CACHE_DIR / (local_name + ".tmp")
-
-    attempt = 0
-    while attempt < max_retries:
-        attempt += 1
-        try:
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                with tmp_path.open("wb") as f:
-                    chunk_size = 1024 * 64
-                    while True:
-                        chunk = resp.read(chunk_size)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-
-            tmp_path.replace(local_path)
-            return local_path
-
-        except urllib.error.HTTPError as e:
-            if 400 <= e.code < 500:
-                raise
-            last_exc = e
-        except Exception as e:
-            last_exc = e
-
-        time.sleep(2 ** attempt)
-
-    raise last_exc
 
 ratings = None
 anime_df = None
@@ -133,27 +70,102 @@ rbm = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global ratings, anime_df, user_anime, anime_ids, rbm, anime_metadata
+    try:
+        ratings, anime_df = load_anime_dataset()
+    except Exception as e:
+        raise RuntimeError(f"Failed to load dataset: {e}")
 
-    ratings, anime_df = load_anime_dataset()
+    try:
+        user_anime, _ = preprocess_data(
+            ratings,
+            min_likes_user=MIN_LIKES_USER,
+            min_likes_anime=MIN_LIKES_ANIME
+        )
+        anime_ids = list(user_anime.columns)
+    except Exception as e:
+        raise RuntimeError(f"Failed to preprocess data: {e}")
 
-    user_anime, _ = preprocess_data(
-        ratings,
-        min_likes_user=MIN_LIKES_USER,
-        min_likes_anime=MIN_LIKES_ANIME
-    )
-    anime_ids = list(user_anime.columns)
+    try:
+        rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device) if anime_ids else None
+    except Exception as e:
+        raise RuntimeError(f"Failed to create RBM instance: {e}")
 
-    rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device)
+    try:
+        if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
+            try:
+                model_path = download_to_cache(MODEL_URI)
+                if model_path.exists() and rbm is not None:
+                    try:
+                        ckpt = torch.load(model_path, map_location=device)
+                        state_dict = ckpt if isinstance(ckpt, dict) and all(isinstance(v, torch.Tensor) for v in ckpt.values()) else ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
+                        EXPECTED_N_VISIBLE = len(anime_ids) if anime_ids is not None else None
 
-    model_path = _resolve_resource(MODEL_URI, DEFAULT_MODEL_PATH)
-    if model_path.exists():
-        rbm.load_state_dict(torch.load(model_path, map_location=device))
+                        ckpt_v_bias = None
+                        ckpt_W = None
+                        for k, v in state_dict.items():
+                            if k.endswith('v_bias') and isinstance(v, torch.Tensor):
+                                ckpt_v_bias = v.shape
+                            if k.endswith('W') and isinstance(v, torch.Tensor):
+                                ckpt_W = v.shape
 
-    metadata_path = _resolve_resource(METADATA_URI, DEFAULT_METADATA_PATH)
-    if metadata_path.exists():
-        global anime_metadata
-        with metadata_path.open("r", encoding="utf-8") as f:
-            anime_metadata = json.load(f)
+                        mismatch = False
+                        if ckpt_v_bias is not None and EXPECTED_N_VISIBLE is not None:
+                            if ckpt_v_bias[0] != EXPECTED_N_VISIBLE:
+                                mismatch = True
+                        if ckpt_W is not None and EXPECTED_N_VISIBLE is not None:
+                            if ckpt_W[1] != EXPECTED_N_VISIBLE:
+                                mismatch = True
+
+                        if mismatch:
+                            raise RuntimeError("Checkpoint shape mismatch: RBM will be uninitialized.")
+                        else:
+                            rbm.load_state_dict(state_dict)
+                    except Exception as e:
+                        raise RuntimeError(f"Failed to load model checkpoint contents: {e}")
+                else:
+                    raise FileNotFoundError(f"Model path {model_path} does not exist or RBM not created; starting without model.")
+            except Exception as e:
+                raise RuntimeError(f"Failed to download model from {MODEL_URI}: {e}")
+        else:
+            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; skipping model load (no local fallback).")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load model from {MODEL_URI}: {e}")
+
+    try:
+        if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
+            try:
+                metadata_path = download_to_cache(METADATA_URI)
+                if metadata_path.exists():
+                    with metadata_path.open("r", encoding="utf-8") as f:
+                        anime_metadata = json.load(f)
+                else:
+                    raise FileNotFoundError(f"Metadata path {metadata_path} does not exist after download.")
+            except Exception as e:
+                raise RuntimeError(f"Failed to download metadata from {METADATA_URI}: {e}")
+        else:
+            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; skipping metadata load (no local fallback).")
+    except Exception as e:
+        raise RuntimeError(f"Failed to load metadata from {METADATA_URI}: {e}")
+
+    try:
+        anime_cache = None
+        reviews_cache = None
+        for p in CACHE_DIR.iterdir():
+            if p.name.lower().endswith("anime.csv"):
+                anime_cache = str(p)
+            if p.name.lower().endswith("user-animereview.csv") or p.name.lower().endswith("user_animereview.csv"):
+                reviews_cache = str(p)
+
+        if anime_cache or reviews_cache:
+            try:
+                if anime_cache:
+                    anime_df = pd.read_csv(anime_cache)
+                if reviews_cache:
+                    user_anime = pd.read_csv(reviews_cache)
+            except Exception as e:
+                print(f"Warning: failed to load cached data: {e}")
+    except Exception as e:
+        print(f"Warning: failed to load cache directory: {e}")
 
     yield
 

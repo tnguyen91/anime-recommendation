@@ -11,8 +11,10 @@ services:
       - MODEL_URI=${MODEL_URI}
       - METADATA_URI=${METADATA_URI}
       - CACHE_DIR=/app/cache
+      - ANIME_CSV_URI=${ANIME_CSV_URI}
+      - USER_REVIEW_CSV_URI=${USER_REVIEW_CSV_URI}
+
     volumes:
-      - ./data:/app/data
       - ./cache:/app/cache
 
   frontend:

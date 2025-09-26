@@ -1,10 +1,7 @@
 from __future__ import annotations
-
 from typing import Tuple
-
 import torch
 import torch.nn as nn
-
 
 class RBM(nn.Module):
     def __init__(self, n_visible: int, n_hidden: int) -> None:
