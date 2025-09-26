@@ -1,24 +1,24 @@
-__pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.so
 *.whl
-venv/
+.vscode
 
 .env
 .env.*
 
 .git
 .gitignore
-.ipynb_checkpoints/
-.pytest_cache/
 
-out/
 requirements-train.txt
 data_analysis.ipynb
-taskdef.json
 
 rbm/
-anime-recommender-ui/
+out/
 data/
+cache/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+venv/
