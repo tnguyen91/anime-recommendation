@@ -11,5 +11,5 @@ data:
   min_likes_anime: 50
 
 paths:
-  model_path: "out/rbm_best_model.pth"
-  output_csv: "out/recommendations.csv"
+  model_path: "../out/rbm_best_model.pth"
+  output_csv: "../out/recommendations.csv"

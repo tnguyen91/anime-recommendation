@@ -82,8 +82,11 @@ def main(train_model=True, run_cli=True, n_hidden=None, epochs=None,
         )
     else:
         if os.path.exists(path_cfg['model_path']):
+            print(f"Loading model from {path_cfg['model_path']}")
             rbm.load_state_dict(torch.load(path_cfg['model_path'], map_location=device))
+
         else:
+            print(f"Model path {path_cfg['model_path']} does not exist; exiting.")
             return
 
     if run_cli:
