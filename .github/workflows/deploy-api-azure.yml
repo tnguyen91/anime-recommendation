@@ -1,8 +1,9 @@
 name: Deploy API to Azure Web App (publish profile)
 
 on:
-  push:
-    branches: ['**']
+  workflow_run:
+    workflows: ["Build and push Docker image"]
+    types: [completed]
 
 jobs:
   deploy:
