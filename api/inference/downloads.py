@@ -7,7 +7,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 import os
 
-CACHE_DIR = Path(os.getenv("CACHE_DIR")).resolve()
+_env_cache = os.environ.get("CACHE_DIR")
+if _env_cache:
+    CACHE_DIR = Path(_env_cache).resolve()
+else:
+    azure_home = Path("/home/site/wwwroot")
+    if azure_home.exists():
+        CACHE_DIR = (azure_home / "cache").resolve()
+    else:
+        CACHE_DIR = Path("/tmp/cache").resolve()
+
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 def download_to_cache(url: str, max_retries: int = 3, timeout: int = 30) -> Path:
