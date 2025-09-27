@@ -50,9 +50,13 @@ class SearchResponse(BaseModel):
     results: list[SearchResult]
 
 cache_env = os.getenv("CACHE_DIR")
-if not cache_env:
-    raise EnvironmentError("CACHE_DIR environment variable must be set to a valid directory path.")
-CACHE_DIR = Path(cache_env).resolve()
+if cache_env:
+    CACHE_DIR = Path(cache_env).resolve()
+else:
+    azure_home = Path("/home/site/wwwroot")
+    default_cache_base = azure_home if azure_home.exists() else Path("/tmp")
+    CACHE_DIR = (default_cache_base / "cache").resolve()
+
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 MODEL_URI = os.getenv("MODEL_URI")
 METADATA_URI = os.getenv("METADATA_URI")

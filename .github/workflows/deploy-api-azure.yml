@@ -15,8 +15,11 @@ jobs:
       - name: Create deployment package
         run: |
           set -euo pipefail
-          echo "Creating api-deploy.zip from ./api/"
-          zip -r api-deploy.zip api -x "**/__pycache__/*" "**/.pytest_cache/*" "**/*.pyc"
+          echo "Creating api-deploy.zip from ./api contents"
+          (
+            cd api
+            zip -r ../api-deploy.zip . -x "**/__pycache__/*" "**/.pytest_cache/*" "**/*.pyc"
+          )
 
       - name: Deploy using publish profile 
         uses: azure/webapps-deploy@v2
