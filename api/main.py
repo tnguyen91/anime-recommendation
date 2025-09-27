@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,8 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
 
+logger = logging.getLogger(__name__)
+
 cache_env = os.getenv("CACHE_DIR")
 if cache_env:
     CACHE_DIR = Path(cache_env).resolve()
@@ -77,79 +80,84 @@ async def lifespan(app: FastAPI):
     try:
         ratings, anime_df = load_anime_dataset()
     except Exception as e:
-        raise RuntimeError(f"Failed to load dataset: {e}")
+        logger.exception("Failed to load dataset: %s", e)
+        ratings = pd.DataFrame()
+        anime_df = pd.DataFrame()
 
-    try:
-        user_anime, _ = preprocess_data(
-            ratings,
-            min_likes_user=MIN_LIKES_USER,
-            min_likes_anime=MIN_LIKES_ANIME
-        )
-        anime_ids = list(user_anime.columns)
-    except Exception as e:
-        raise RuntimeError(f"Failed to preprocess data: {e}")
+    if not anime_df.empty:
+        try:
+            user_anime, _ = preprocess_data(
+                ratings,
+                min_likes_user=MIN_LIKES_USER,
+                min_likes_anime=MIN_LIKES_ANIME
+            )
+            anime_ids = list(user_anime.columns)
+        except Exception as e:
+            logger.exception("Failed to preprocess data: %s", e)
+            user_anime = pd.DataFrame()
+            anime_ids = []
+    else:
+        user_anime = pd.DataFrame()
+        anime_ids = []
 
-    try:
-        rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device) if anime_ids else None
-    except Exception as e:
-        raise RuntimeError(f"Failed to create RBM instance: {e}")
+    if anime_ids:
+        try:
+            rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device)
+        except Exception as e:
+            logger.exception("Failed to create RBM instance: %s", e)
+            rbm = None
+    else:
+        rbm = None
 
-    try:
-        if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
-            try:
-                model_path = download_to_cache(MODEL_URI)
-                if model_path.exists() and rbm is not None:
-                    try:
-                        ckpt = torch.load(model_path, map_location=device)
-                        state_dict = ckpt if isinstance(ckpt, dict) and all(isinstance(v, torch.Tensor) for v in ckpt.values()) else ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
-                        EXPECTED_N_VISIBLE = len(anime_ids) if anime_ids is not None else None
+    if rbm is not None and MODEL_URI and MODEL_URI.startswith(("http://", "https://")):
+        try:
+            model_path = download_to_cache(MODEL_URI)
+            if model_path.exists():
+                ckpt = torch.load(model_path, map_location=device)
+                state_dict = ckpt if isinstance(ckpt, dict) and all(isinstance(v, torch.Tensor) for v in ckpt.values()) else ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
+                EXPECTED_N_VISIBLE = len(anime_ids) if anime_ids is not None else None
 
-                        ckpt_v_bias = None
-                        ckpt_W = None
-                        for k, v in state_dict.items():
-                            if k.endswith('v_bias') and isinstance(v, torch.Tensor):
-                                ckpt_v_bias = v.shape
-                            if k.endswith('W') and isinstance(v, torch.Tensor):
-                                ckpt_W = v.shape
+                ckpt_v_bias = None
+                ckpt_W = None
+                for k, v in state_dict.items():
+                    if k.endswith('v_bias') and isinstance(v, torch.Tensor):
+                        ckpt_v_bias = v.shape
+                    if k.endswith('W') and isinstance(v, torch.Tensor):
+                        ckpt_W = v.shape
 
-                        mismatch = False
-                        if ckpt_v_bias is not None and EXPECTED_N_VISIBLE is not None:
-                            if ckpt_v_bias[0] != EXPECTED_N_VISIBLE:
-                                mismatch = True
-                        if ckpt_W is not None and EXPECTED_N_VISIBLE is not None:
-                            if ckpt_W[1] != EXPECTED_N_VISIBLE:
-                                mismatch = True
+                mismatch = False
+                if ckpt_v_bias is not None and EXPECTED_N_VISIBLE is not None and ckpt_v_bias[0] != EXPECTED_N_VISIBLE:
+                    mismatch = True
+                if ckpt_W is not None and EXPECTED_N_VISIBLE is not None and ckpt_W[1] != EXPECTED_N_VISIBLE:
+                    mismatch = True
 
-                        if mismatch:
-                            raise RuntimeError("Checkpoint shape mismatch: RBM will be uninitialized.")
-                        else:
-                            rbm.load_state_dict(state_dict)
-                    except Exception as e:
-                        raise RuntimeError(f"Failed to load model checkpoint contents: {e}")
+                if mismatch:
+                    logger.error("Checkpoint shape mismatch for RBM; running without pre-trained weights.")
                 else:
-                    raise FileNotFoundError(f"Model path {model_path} does not exist or RBM not created; starting without model.")
-            except Exception as e:
-                raise RuntimeError(f"Failed to download model from {MODEL_URI}: {e}")
-        else:
-            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; skipping model load (no local fallback).")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load model from {MODEL_URI}: {e}")
+                    rbm.load_state_dict(state_dict)
+            else:
+                logger.warning("Model path %s does not exist after download; starting without model.", model_path)
+        except Exception as e:
+            logger.exception("Failed to load model from %s: %s", MODEL_URI, e)
+    elif MODEL_URI:
+        logger.warning("MODEL_URI is set but not an http(s) URL; skipping model download.")
+    else:
+        logger.info("MODEL_URI not provided; starting without model checkpoint.")
 
-    try:
-        if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
-            try:
-                metadata_path = download_to_cache(METADATA_URI)
-                if metadata_path.exists():
-                    with metadata_path.open("r", encoding="utf-8") as f:
-                        anime_metadata = json.load(f)
-                else:
-                    raise FileNotFoundError(f"Metadata path {metadata_path} does not exist after download.")
-            except Exception as e:
-                raise RuntimeError(f"Failed to download metadata from {METADATA_URI}: {e}")
-        else:
-            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; skipping metadata load (no local fallback).")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load metadata from {METADATA_URI}: {e}")
+    if METADATA_URI and METADATA_URI.startswith(("http://", "https://")):
+        try:
+            metadata_path = download_to_cache(METADATA_URI)
+            if metadata_path.exists():
+                with metadata_path.open("r", encoding="utf-8") as f:
+                    anime_metadata = json.load(f)
+            else:
+                logger.warning("Metadata path %s does not exist after download.", metadata_path)
+        except Exception as e:
+            logger.exception("Failed to download metadata from %s: %s", METADATA_URI, e)
+    elif METADATA_URI:
+        logger.warning("METADATA_URI is set but not an http(s) URL; skipping metadata download.")
+    else:
+        logger.info("METADATA_URI not provided; metadata-dependent fields may be empty.")
 
     try:
         anime_cache = None
@@ -167,9 +175,9 @@ async def lifespan(app: FastAPI):
                 if reviews_cache:
                     user_anime = pd.read_csv(reviews_cache)
             except Exception as e:
-                print(f"Warning: failed to load cached data: {e}")
+                logger.warning("Failed to load cached CSVs: %s", e)
     except Exception as e:
-        print(f"Warning: failed to load cache directory: {e}")
+        logger.warning("Failed to inspect cache directory %s: %s", CACHE_DIR, e)
 
     yield
 
@@ -228,6 +236,9 @@ async def recommend(request: RecommendRequest):
     if not liked_anime:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="liked_anime must be a non-empty list")
 
+    if anime_df is None or anime_df.empty or not anime_ids:
+        raise HTTPException(status_code=503, detail="Recommendation engine not initialized")
+
     matched_ids = anime_df[anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
     if not matched_ids:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="No matching anime found")
@@ -258,6 +269,9 @@ async def search_anime(query: str = ""):
 
     if not query:
         return SearchResponse(results=[])
+
+    if anime_df is None or anime_df.empty:
+        raise HTTPException(status_code=503, detail="Anime catalog not loaded")
 
     if len(query) > 100:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Query too long (max 100 chars)")
