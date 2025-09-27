@@ -15,9 +15,21 @@ jobs:
       - name: Create deployment package
         run: |
           set -euo pipefail
-          echo "Creating api-deploy.zip from ./api contents"
+          echo "Preparing deployment bundle"
+          rm -rf build && mkdir -p build/api
+          rsync -a \
+            --exclude '__pycache__/' \
+            --exclude '.pytest_cache/' \
+            --exclude '*.pyc' \
+            --exclude 'requirements.txt' \
+            --exclude 'startup.txt' \
+            --exclude 'Dockerfile' \
+            api/ build/api/
+          cp api/requirements.txt build/requirements.txt
+          cp api/startup.txt build/startup.txt
+          echo "Creating api-deploy.zip from build/"
           (
-            cd api
+            cd build
             zip -r ../api-deploy.zip . -x "**/__pycache__/*" "**/.pytest_cache/*" "**/*.pyc"
           )
 
