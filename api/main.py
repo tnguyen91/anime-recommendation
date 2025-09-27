@@ -9,8 +9,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
-import asyncio
-import logging
 
 from api.config import (
     DEFAULT_TOP_N,
@@ -61,10 +59,6 @@ METADATA_URI = os.getenv("METADATA_URI")
 
 anime_metadata: dict[str, Any] = {}
 
-model_loaded = False
-metadata_loaded = False
-dataset_loaded = False
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ratings = None
@@ -73,114 +67,105 @@ user_anime = None
 anime_ids = None
 rbm = None
 
-logging.basicConfig(level=logging.INFO)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global ratings, anime_df, user_anime, anime_ids, rbm, anime_metadata
-    global model_loaded, metadata_loaded, dataset_loaded
-
-    logging.info("Starting application lifespan: running blocking startup tasks")
-
-    anime_cache = None
-    reviews_cache = None
     try:
-        for p in CACHE_DIR.iterdir():
-            if p.name.lower().endswith("anime.csv"):
-                anime_cache = p
-            if p.name.lower().endswith("user-animereview.csv") or p.name.lower().endswith("user_animereview.csv"):
-                reviews_cache = p
-
-        if anime_cache and reviews_cache:
-            logging.info("Loading dataset from cache: %s, %s", anime_cache, reviews_cache)
-            anime_df = pd.read_csv(anime_cache)
-            ratings = pd.read_csv(reviews_cache)
-        else:
-            anime_uri = os.environ.get("ANIME_CSV_URI")
-            review_uri = os.environ.get("USER_REVIEW_CSV_URI")
-            if not anime_uri or not review_uri:
-                raise RuntimeError("ANIME_CSV_URI and USER_REVIEW_CSV_URI must be set for foreground download")
-
-            logging.info("Downloading dataset synchronously")
-            anime_path = download_to_cache(anime_uri)
-            review_path = download_to_cache(review_uri)
-            anime_df = pd.read_csv(anime_path)
-            ratings = pd.read_csv(review_path)
-
-        try:
-            user_anime, _ = preprocess_data(ratings, min_likes_user=MIN_LIKES_USER, min_likes_anime=MIN_LIKES_ANIME)
-        except Exception:
-            ratings_filtered, anime_filtered = preprocess_data(ratings, min_likes_user=MIN_LIKES_USER, min_likes_anime=MIN_LIKES_ANIME)
-            user_anime = ratings_filtered.pivot_table(index='user_id', columns='anime_id', values='liked', fill_value=0)
-
-        anime_ids = list(user_anime.columns) if user_anime is not None else []
-        rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device) if anime_ids else None
-        dataset_loaded = True
-        logging.info("Dataset loaded: anime=%s users=%s", len(anime_df) if anime_df is not None else None, len(user_anime) if user_anime is not None else None)
-
+        ratings, anime_df = load_anime_dataset()
     except Exception as e:
-        logging.exception("Failed during dataset startup: %s", e)
-        raise
+        raise RuntimeError(f"Failed to load dataset: {e}")
+
+    try:
+        user_anime, _ = preprocess_data(
+            ratings,
+            min_likes_user=MIN_LIKES_USER,
+            min_likes_anime=MIN_LIKES_ANIME
+        )
+        anime_ids = list(user_anime.columns)
+    except Exception as e:
+        raise RuntimeError(f"Failed to preprocess data: {e}")
+
+    try:
+        rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device) if anime_ids else None
+    except Exception as e:
+        raise RuntimeError(f"Failed to create RBM instance: {e}")
 
     try:
         if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
-            logging.info("Downloading model synchronously from %s", MODEL_URI)
-            model_path = download_to_cache(MODEL_URI)
-            if model_path.exists() and rbm is not None:
-                ckpt = torch.load(model_path, map_location=device)
-                state_dict = None
-                if isinstance(ckpt, dict):
-                    state_dict = ckpt if all(isinstance(v, torch.Tensor) for v in ckpt.values()) else ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
+            try:
+                model_path = download_to_cache(MODEL_URI)
+                if model_path.exists() and rbm is not None:
+                    try:
+                        ckpt = torch.load(model_path, map_location=device)
+                        state_dict = ckpt if isinstance(ckpt, dict) and all(isinstance(v, torch.Tensor) for v in ckpt.values()) else ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
+                        EXPECTED_N_VISIBLE = len(anime_ids) if anime_ids is not None else None
+
+                        ckpt_v_bias = None
+                        ckpt_W = None
+                        for k, v in state_dict.items():
+                            if k.endswith('v_bias') and isinstance(v, torch.Tensor):
+                                ckpt_v_bias = v.shape
+                            if k.endswith('W') and isinstance(v, torch.Tensor):
+                                ckpt_W = v.shape
+
+                        mismatch = False
+                        if ckpt_v_bias is not None and EXPECTED_N_VISIBLE is not None:
+                            if ckpt_v_bias[0] != EXPECTED_N_VISIBLE:
+                                mismatch = True
+                        if ckpt_W is not None and EXPECTED_N_VISIBLE is not None:
+                            if ckpt_W[1] != EXPECTED_N_VISIBLE:
+                                mismatch = True
+
+                        if mismatch:
+                            raise RuntimeError("Checkpoint shape mismatch: RBM will be uninitialized.")
+                        else:
+                            rbm.load_state_dict(state_dict)
+                    except Exception as e:
+                        raise RuntimeError(f"Failed to load model checkpoint contents: {e}")
                 else:
-                    state_dict = ckpt
-
-                EXPECTED_N_VISIBLE = len(anime_ids) if anime_ids is not None else None
-                ckpt_v_bias = None
-                ckpt_W = None
-                if isinstance(state_dict, dict):
-                    for k, v in state_dict.items():
-                        if k.endswith('v_bias') and hasattr(v, 'shape'):
-                            ckpt_v_bias = v.shape
-                        if k.endswith('W') and hasattr(v, 'shape'):
-                            ckpt_W = v.shape
-
-                mismatch = False
-                if ckpt_v_bias is not None and EXPECTED_N_VISIBLE is not None:
-                    if ckpt_v_bias[0] != EXPECTED_N_VISIBLE:
-                        mismatch = True
-                if ckpt_W is not None and EXPECTED_N_VISIBLE is not None:
-                    if ckpt_W[1] != EXPECTED_N_VISIBLE:
-                        mismatch = True
-
-                if mismatch:
-                    raise RuntimeError("Checkpoint shape mismatch: RBM will be uninitialized.")
-                rbm.load_state_dict(state_dict)
-                model_loaded = True
-                logging.info("Model loaded into RBM")
-            else:
-                raise RuntimeError(f"Model path {model_path} does not exist or RBM not created; cannot load model.")
+                    raise FileNotFoundError(f"Model path {model_path} does not exist or RBM not created; starting without model.")
+            except Exception as e:
+                raise RuntimeError(f"Failed to download model from {MODEL_URI}: {e}")
         else:
-            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; cannot load model in foreground mode.")
+            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; skipping model load (no local fallback).")
     except Exception as e:
-        logging.exception("Failed during model startup: %s", e)
-        raise
+        raise RuntimeError(f"Failed to load model from {MODEL_URI}: {e}")
 
     try:
         if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
-            logging.info("Downloading metadata synchronously from %s", METADATA_URI)
-            metadata_path = download_to_cache(METADATA_URI)
-            if metadata_path.exists():
-                with metadata_path.open('r', encoding='utf-8') as f:
-                    anime_metadata = json.load(f)
-                metadata_loaded = True
-                logging.info("Metadata loaded")
-            else:
-                raise RuntimeError(f"Metadata path {metadata_path} does not exist after download.")
+            try:
+                metadata_path = download_to_cache(METADATA_URI)
+                if metadata_path.exists():
+                    with metadata_path.open("r", encoding="utf-8") as f:
+                        anime_metadata = json.load(f)
+                else:
+                    raise FileNotFoundError(f"Metadata path {metadata_path} does not exist after download.")
+            except Exception as e:
+                raise RuntimeError(f"Failed to download metadata from {METADATA_URI}: {e}")
         else:
-            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; cannot load metadata in foreground mode.")
+            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; skipping metadata load (no local fallback).")
     except Exception as e:
-        logging.exception("Failed during metadata startup: %s", e)
-        raise
+        raise RuntimeError(f"Failed to load metadata from {METADATA_URI}: {e}")
+
+    try:
+        anime_cache = None
+        reviews_cache = None
+        for p in CACHE_DIR.iterdir():
+            if p.name.lower().endswith("anime.csv"):
+                anime_cache = str(p)
+            if p.name.lower().endswith("user-animereview.csv") or p.name.lower().endswith("user_animereview.csv"):
+                reviews_cache = str(p)
+
+        if anime_cache or reviews_cache:
+            try:
+                if anime_cache:
+                    anime_df = pd.read_csv(anime_cache)
+                if reviews_cache:
+                    user_anime = pd.read_csv(reviews_cache)
+            except Exception as e:
+                print(f"Warning: failed to load cached data: {e}")
+    except Exception as e:
+        print(f"Warning: failed to load cache directory: {e}")
 
     yield
 
@@ -229,17 +214,6 @@ async def health():
     except Exception as e:
         health_status["services"]["data"] = {"status": "error", "error": str(e)}
         health_status["status"] = "degraded"
-
-    try:
-        health_status["services"]["background"] = {
-            "model_loaded": bool(model_loaded),
-            "metadata_loaded": bool(metadata_loaded),
-            "dataset_loaded": bool(dataset_loaded),
-        }
-        if not (model_loaded and metadata_loaded and dataset_loaded):
-            health_status["status"] = "degraded"
-    except Exception:
-        pass
 
     return health_status
 
