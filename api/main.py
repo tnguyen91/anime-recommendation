@@ -9,6 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+import asyncio
+import logging
 
 from api.config import (
     DEFAULT_TOP_N,
@@ -59,6 +61,10 @@ METADATA_URI = os.getenv("METADATA_URI")
 
 anime_metadata: dict[str, Any] = {}
 
+model_loaded = False
+metadata_loaded = False
+dataset_loaded = False
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ratings = None
@@ -67,105 +73,116 @@ user_anime = None
 anime_ids = None
 rbm = None
 
+logging.basicConfig(level=logging.INFO)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global ratings, anime_df, user_anime, anime_ids, rbm, anime_metadata
-    try:
-        ratings, anime_df = load_anime_dataset()
-    except Exception as e:
-        raise RuntimeError(f"Failed to load dataset: {e}")
 
-    try:
-        user_anime, _ = preprocess_data(
-            ratings,
-            min_likes_user=MIN_LIKES_USER,
-            min_likes_anime=MIN_LIKES_ANIME
-        )
-        anime_ids = list(user_anime.columns)
-    except Exception as e:
-        raise RuntimeError(f"Failed to preprocess data: {e}")
+    logging.info("Starting application lifespan: scheduling background startup task")
 
-    try:
-        rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device) if anime_ids else None
-    except Exception as e:
-        raise RuntimeError(f"Failed to create RBM instance: {e}")
+    async def _background_startup():
+        global ratings, anime_df, user_anime, anime_ids, rbm, anime_metadata
+        global model_loaded, metadata_loaded, dataset_loaded
 
-    try:
-        if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
-            try:
-                model_path = download_to_cache(MODEL_URI)
-                if model_path.exists() and rbm is not None:
-                    try:
-                        ckpt = torch.load(model_path, map_location=device)
-                        state_dict = ckpt if isinstance(ckpt, dict) and all(isinstance(v, torch.Tensor) for v in ckpt.values()) else ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
-                        EXPECTED_N_VISIBLE = len(anime_ids) if anime_ids is not None else None
+        try:
+            anime_cache = None
+            reviews_cache = None
+            for p in CACHE_DIR.iterdir():
+                if p.name.lower().endswith("anime.csv"):
+                    anime_cache = p
+                if p.name.lower().endswith("user-animereview.csv") or p.name.lower().endswith("user_animereview.csv"):
+                    reviews_cache = p
 
-                        ckpt_v_bias = None
-                        ckpt_W = None
-                        for k, v in state_dict.items():
-                            if k.endswith('v_bias') and isinstance(v, torch.Tensor):
-                                ckpt_v_bias = v.shape
-                            if k.endswith('W') and isinstance(v, torch.Tensor):
-                                ckpt_W = v.shape
+            if anime_cache and reviews_cache:
+                logging.info("Found cached dataset files; loading from cache")
+                def _read_cached():
+                    import pandas as _pd
+                    return _pd.read_csv(reviews_cache), _pd.read_csv(anime_cache)
 
-                        mismatch = False
-                        if ckpt_v_bias is not None and EXPECTED_N_VISIBLE is not None:
-                            if ckpt_v_bias[0] != EXPECTED_N_VISIBLE:
-                                mismatch = True
-                        if ckpt_W is not None and EXPECTED_N_VISIBLE is not None:
-                            if ckpt_W[1] != EXPECTED_N_VISIBLE:
-                                mismatch = True
+                ratings_local, anime_local = await asyncio.to_thread(_read_cached)
+            else:
+                anime_uri = os.environ.get("ANIME_CSV_URI")
+                review_uri = os.environ.get("USER_REVIEW_CSV_URI")
+                if not anime_uri or not review_uri:
+                    logging.warning("ANIME_CSV_URI or USER_REVIEW_CSV_URI not set; skipping remote dataset load.")
+                    ratings_local, anime_local = None, None
+                else:
+                    logging.info("Downloading dataset CSVs from remote URIs")
+                    anime_path = await asyncio.to_thread(download_to_cache, anime_uri)
+                    review_path = await asyncio.to_thread(download_to_cache, review_uri)
+                    def _read_downloaded():
+                        import pandas as _pd
+                        return _pd.read_csv(review_path), _pd.read_csv(anime_path)
+                    ratings_local, anime_local = await asyncio.to_thread(_read_downloaded)
 
-                        if mismatch:
-                            raise RuntimeError("Checkpoint shape mismatch: RBM will be uninitialized.")
+            if ratings_local is not None and anime_local is not None:
+                try:
+                    ratings_filtered, anime_filtered = preprocess_data(ratings_local, min_likes_user=MIN_LIKES_USER, min_likes_anime=MIN_LIKES_ANIME)
+                    user_anime_local = ratings_filtered.pivot_table(index='user_id', columns='anime_id', values='liked', fill_value=0)
+                except Exception:
+                    user_anime_local, _ = preprocess_data(ratings_local, min_likes_user=MIN_LIKES_USER, min_likes_anime=MIN_LIKES_ANIME)
+
+                ratings = ratings_local
+                anime_df = anime_local
+                user_anime = user_anime_local
+                anime_ids = list(user_anime.columns) if user_anime is not None else []
+                if anime_ids:
+                    rbm = RBM(n_visible=len(anime_ids), n_hidden=N_HIDDEN).to(device)
+
+                dataset_loaded = True
+                logging.info("Dataset loaded in background: anime=%s users=%s", len(anime_df) if anime_df is not None else None, len(user_anime) if user_anime is not None else None)
+
+            if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
+                try:
+                    if not anime_ids:
+                        logging.info("RBM not yet created (no dataset). Model will be attempted after dataset if available.")
+
+                    model_path = await asyncio.to_thread(download_to_cache, MODEL_URI)
+                    if model_path.exists() and rbm is not None:
+                        ckpt = await asyncio.to_thread(torch.load, model_path, map_location=device)
+                        state_dict = None
+                        if isinstance(ckpt, dict):
+                            try:
+                                if all(hasattr(v, 'shape') for v in ckpt.values()):
+                                    state_dict = ckpt
+                                else:
+                                    state_dict = ckpt.get('state_dict') or ckpt.get('model_state_dict') or ckpt
+                            except Exception:
+                                state_dict = ckpt
                         else:
-                            rbm.load_state_dict(state_dict)
-                    except Exception as e:
-                        raise RuntimeError(f"Failed to load model checkpoint contents: {e}")
-                else:
-                    raise FileNotFoundError(f"Model path {model_path} does not exist or RBM not created; starting without model.")
-            except Exception as e:
-                raise RuntimeError(f"Failed to download model from {MODEL_URI}: {e}")
-        else:
-            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; skipping model load (no local fallback).")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load model from {MODEL_URI}: {e}")
+                            state_dict = ckpt
 
-    try:
-        if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
-            try:
-                metadata_path = download_to_cache(METADATA_URI)
-                if metadata_path.exists():
-                    with metadata_path.open("r", encoding="utf-8") as f:
-                        anime_metadata = json.load(f)
-                else:
-                    raise FileNotFoundError(f"Metadata path {metadata_path} does not exist after download.")
-            except Exception as e:
-                raise RuntimeError(f"Failed to download metadata from {METADATA_URI}: {e}")
-        else:
-            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; skipping metadata load (no local fallback).")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load metadata from {METADATA_URI}: {e}")
+                        try:
+                            await asyncio.to_thread(rbm.load_state_dict, state_dict)
+                            model_loaded = True
+                            logging.info("Model checkpoint loaded into RBM")
+                        except Exception as e:
+                            logging.warning("Failed to load model state into RBM: %s", e)
+                    else:
+                        logging.warning("Model path not found or RBM not created yet: %s", model_path)
+                except Exception as e:
+                    logging.warning("Background model load failed: %s", e)
 
-    try:
-        anime_cache = None
-        reviews_cache = None
-        for p in CACHE_DIR.iterdir():
-            if p.name.lower().endswith("anime.csv"):
-                anime_cache = str(p)
-            if p.name.lower().endswith("user-animereview.csv") or p.name.lower().endswith("user_animereview.csv"):
-                reviews_cache = str(p)
+            if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
+                try:
+                    metadata_path = await asyncio.to_thread(download_to_cache, METADATA_URI)
+                    if metadata_path.exists():
+                        def _read_json():
+                            with metadata_path.open('r', encoding='utf-8') as f:
+                                return json.load(f)
+                        anime_metadata = await asyncio.to_thread(_read_json)
+                        metadata_loaded = True
+                        logging.info("Metadata loaded from %s", METADATA_URI)
+                    else:
+                        logging.warning("Metadata path does not exist after download: %s", metadata_path)
+                except Exception as e:
+                    logging.warning("Background metadata load failed: %s", e)
 
-        if anime_cache or reviews_cache:
-            try:
-                if anime_cache:
-                    anime_df = pd.read_csv(anime_cache)
-                if reviews_cache:
-                    user_anime = pd.read_csv(reviews_cache)
-            except Exception as e:
-                print(f"Warning: failed to load cached data: {e}")
-    except Exception as e:
-        print(f"Warning: failed to load cache directory: {e}")
+        except Exception as e:
+            logging.exception("Background startup task failed: %s", e)
+
+    asyncio.create_task(_background_startup())
 
     yield
 
@@ -214,6 +231,17 @@ async def health():
     except Exception as e:
         health_status["services"]["data"] = {"status": "error", "error": str(e)}
         health_status["status"] = "degraded"
+
+    try:
+        health_status["services"]["background"] = {
+            "model_loaded": bool(model_loaded),
+            "metadata_loaded": bool(metadata_loaded),
+            "dataset_loaded": bool(dataset_loaded),
+        }
+        if not (model_loaded and metadata_loaded and dataset_loaded):
+            health_status["status"] = "degraded"
+    except Exception:
+        pass
 
     return health_status
 
