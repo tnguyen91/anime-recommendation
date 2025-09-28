@@ -53,9 +53,7 @@ cache_env = os.getenv("CACHE_DIR")
 if cache_env:
     CACHE_DIR = Path(cache_env).resolve()
 else:
-    azure_home = Path("/home/site/wwwroot")
-    default_cache_base = azure_home if azure_home.exists() else Path("/tmp")
-    CACHE_DIR = (default_cache_base / "cache").resolve()
+    CACHE_DIR = Path("/tmp/cache").resolve()
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 MODEL_URI = os.getenv("MODEL_URI")
@@ -186,6 +184,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def root():
+    return await health()
 
 @app.get("/health")
 async def health():
