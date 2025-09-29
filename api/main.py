@@ -21,7 +21,7 @@ from api.config import (
 from api.inference.data_loader import load_anime_dataset
 from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
-from api.inference.preprocess import preprocess_data
+from api.inference.preprocess import filter_data
 from api.inference.recommender import get_recommendations
 
 class RecommendRequest(BaseModel):
@@ -78,12 +78,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Failed to load dataset: {e}")
 
     try:
-        user_anime, _ = preprocess_data(
+        anime_ids_list, filtered_ratings = filter_data(
             ratings,
             min_likes_user=MIN_LIKES_USER,
             min_likes_anime=MIN_LIKES_ANIME
         )
-        anime_ids = list(user_anime.columns)
+        anime_ids = list(anime_ids_list) if anime_ids_list is not None else []
     except Exception as e:
         raise RuntimeError(f"Failed to preprocess data: {e}")
 
@@ -162,8 +162,6 @@ async def lifespan(app: FastAPI):
             try:
                 if anime_cache:
                     anime_df = pd.read_csv(anime_cache)
-                if reviews_cache:
-                    user_anime = pd.read_csv(reviews_cache)
             except Exception as e:
                 print(f"Warning: failed to load cached data: {e}")
     except Exception as e:

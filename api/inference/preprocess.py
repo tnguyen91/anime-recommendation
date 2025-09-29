@@ -10,7 +10,11 @@ def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFr
     return ratings_clean, anime_clean
 
 
-def preprocess_data(ratings_df: pd.DataFrame, min_likes_user: int, min_likes_anime: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def filter_data(
+    ratings_df: pd.DataFrame,
+    min_likes_user: int,
+    min_likes_anime: int,
+) -> tuple[list[int], pd.DataFrame]:
     df = ratings_df.copy()
     df = df[df['status'] == 'Completed']
     df['liked'] = (df['score'] >= RATING_THRESHOLD).astype(int)
@@ -21,11 +25,4 @@ def preprocess_data(ratings_df: pd.DataFrame, min_likes_user: int, min_likes_ani
     active_users = user_likes[user_likes >= min_likes_user].index
     df = df[df['user_id'].isin(active_users)]
 
-    user_anime = df.pivot_table(
-        index='user_id',
-        columns='anime_id',
-        values='liked',
-        fill_value=0
-    )
-
-    return user_anime, df
+    return list(active_anime.astype(int)), df

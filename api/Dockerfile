@@ -38,4 +38,5 @@ RUN pip install --no-index --find-links=/wheels --no-cache-dir -r requirements.t
 COPY api ./api
 
 EXPOSE 8000
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENV PORT=8000
+ENTRYPOINT ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${UVICORN_WORKERS:-1} --timeout-keep-alive 60"]
