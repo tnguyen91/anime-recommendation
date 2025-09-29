@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Failed to create RBM instance: {e}")
 
     try:
-        if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
+        if MODEL_URI:
             try:
                 model_path = download_to_cache(MODEL_URI)
                 if model_path.exists() and rbm is not None:
@@ -127,14 +127,12 @@ async def lifespan(app: FastAPI):
                 else:
                     raise FileNotFoundError(f"Model path {model_path} does not exist or RBM not created; starting without model.")
             except Exception as e:
-                raise RuntimeError(f"Failed to download model from {MODEL_URI}: {e}")
-        else:
-            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; skipping model load (no local fallback).")
+                raise RuntimeError(f"Failed to download/load model from {MODEL_URI}: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to load model from {MODEL_URI}: {e}")
 
     try:
-        if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
+        if METADATA_URI:
             try:
                 metadata_path = download_to_cache(METADATA_URI)
                 if metadata_path.exists():
@@ -143,9 +141,7 @@ async def lifespan(app: FastAPI):
                 else:
                     raise FileNotFoundError(f"Metadata path {metadata_path} does not exist after download.")
             except Exception as e:
-                raise RuntimeError(f"Failed to download metadata from {METADATA_URI}: {e}")
-        else:
-            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; skipping metadata load (no local fallback).")
+                raise RuntimeError(f"Failed to download/load metadata from {METADATA_URI}: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to load metadata from {METADATA_URI}: {e}")
 
