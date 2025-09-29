@@ -1,7 +1,7 @@
 model:
-  n_hidden: 1024
+  n_hidden: 256
   learning_rate: 0.001
-  batch_size: 32
+  batch_size: 16
   epochs: 30
   k: 10
 
@@ -11,5 +11,5 @@ data:
   min_likes_anime: 50
 
 paths:
-  model_path: "../out/rbm_best_model.pth"
-  output_csv: "../out/recommendations.csv"
+  model_path: "out/rbm_best_model.pth"
+  output_csv: "out/recommendations.csv"

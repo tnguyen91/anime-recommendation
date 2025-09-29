@@ -1,6 +1,5 @@
 import torch
 
-
 def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
     rbm.eval()
     train_tensor = train_tensor.to(device)

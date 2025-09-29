@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from typing import Tuple
 
-
 class RBM(nn.Module):
     def __init__(self, n_visible, n_hidden):
         super().__init__()

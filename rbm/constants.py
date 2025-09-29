@@ -32,17 +32,11 @@ CONFIG_FILE = "config.yaml"
 ANIME_METADATA_FILE = os.path.join(DATA_DIR, "anime_metadata.json") 
 
 DEFAULT_FIGURE_SIZE = (10, 6)
-
 SEED = 1234
 DEFAULT_TOP_N = 10
-N_HIDDEN = 1024
-EPOCHS = 30
-BATCH_SIZE = 32
-DEFAULT_LEARNING_RATE = 0.001
-DEFAULT_K = 10
 
 HYPERPARAMETER_GRID: Dict[str, List] = {
-    "n_hidden": [512, 1024],
+    "n_hidden": [256, 512, 1024],
     "learning_rate": [0.01, 0.001, 0.0001],
     "batch_size": [16, 32, 64],
 }

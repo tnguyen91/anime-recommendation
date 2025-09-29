@@ -1,20 +1,28 @@
 import os
 import argparse
+import random as _random
 import numpy as np
 import torch
 import yaml
 
-from constants import (
-    SEED, N_HIDDEN, EPOCHS, BATCH_SIZE,
-    DEFAULT_LEARNING_RATE, DEFAULT_K, DEFAULT_TOP_N, CONFIG_FILE, OUTPUT_DIR
-)
-from src.data_loader import load_anime_dataset
-from src.model import RBM
-from src.train import train_rbm
-from src.utils import (
-    preprocess_data, make_train_test_split, plot_training_metrics,
-    interactive_recommender
-)
+try:
+    from rbm.constants import SEED, DEFAULT_TOP_N, CONFIG_FILE, OUTPUT_DIR
+    from rbm.src.data_loader import load_anime_dataset
+    from rbm.src.model import RBM
+    from rbm.src.train import train_rbm
+    from rbm.src.utils import (
+        preprocess_data, make_train_test_split, plot_training_metrics,
+        interactive_recommender
+    )
+except Exception:
+    from constants import SEED, DEFAULT_TOP_N, CONFIG_FILE, OUTPUT_DIR
+    from src.data_loader import load_anime_dataset
+    from src.model import RBM
+    from src.train import train_rbm
+    from src.utils import (
+        preprocess_data, make_train_test_split, plot_training_metrics,
+        interactive_recommender
+    )
 
 def load_config():
     config_path = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
@@ -27,12 +35,23 @@ model_cfg = config['model']
 data_cfg = config['data']
 path_cfg = config['paths']
 
-np.random.seed(SEED)
-torch.manual_seed(SEED)
-
+for k, v in list(path_cfg.items()):
+    if isinstance(v, str) and not os.path.isabs(v):
+        if v.startswith('out'):
+            path_cfg[k] = os.path.normpath(os.path.join(OUTPUT_DIR, os.path.relpath(v, 'out')))
+        else:
+            path_cfg[k] = os.path.normpath(os.path.join(os.path.dirname(__file__), v))
 
 def load_and_preprocess_data():
     ratings, anime = load_anime_dataset()
+    import random as _random
+    _random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    try:
+        torch.cuda.manual_seed_all(SEED)
+    except Exception:
+        pass
     user_anime, _ = preprocess_data(
         ratings,
         min_likes_user=data_cfg["min_likes_user"],
@@ -50,6 +69,9 @@ def prepare_train_test_data(user_anime):
 
 
 def train_workflow(rbm, train_tensor, test_tensor, train_df, test_arr, user_anime, anime, device, **kwargs):
+    print(f"Training RBM with n_hidden={kwargs['n_hidden']}, learning_rate={kwargs['learning_rate']}, "
+          f"batch_size={kwargs['batch_size']}, epochs={kwargs['epochs']}, k={kwargs['k']} on {device}")
+
     rbm, losses, precs, maps, ndcgs = train_rbm(
         rbm, train_tensor, test_tensor,
         epochs=kwargs['epochs'],
@@ -72,6 +94,18 @@ def main(train_model=True, run_cli=True, n_hidden=None, epochs=None,
     
     ratings, anime, user_anime = load_and_preprocess_data()
     train_df, test_arr, train_tensor, test_tensor, device = prepare_train_test_data(user_anime)
+    _random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    try:
+        torch.cuda.manual_seed_all(SEED)
+    except Exception:
+        pass
+    try:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    except Exception:
+        pass
     rbm = RBM(n_visible=train_tensor.shape[1], n_hidden=n_hidden).to(device)
 
     if train_model:
@@ -84,7 +118,6 @@ def main(train_model=True, run_cli=True, n_hidden=None, epochs=None,
         if os.path.exists(path_cfg['model_path']):
             print(f"Loading model from {path_cfg['model_path']}")
             rbm.load_state_dict(torch.load(path_cfg['model_path'], map_location=device))
-
         else:
             print(f"Model path {path_cfg['model_path']} does not exist; exiting.")
             return
@@ -96,11 +129,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RBM Anime Recommender")
     parser.add_argument('--train', action='store_true')
     parser.add_argument('--no-cli', action='store_true')
-    parser.add_argument('--epochs', type=int, default=EPOCHS)
-    parser.add_argument('--batch-size', type=int, default=BATCH_SIZE)
-    parser.add_argument('--learning-rate', type=float, default=DEFAULT_LEARNING_RATE)
-    parser.add_argument('--n-hidden', type=int, default=N_HIDDEN)
-    parser.add_argument('--k', type=int, default=DEFAULT_K)
+    parser.add_argument('--epochs', type=int, default=model_cfg.get('epochs'))
+    parser.add_argument('--batch-size', type=int, default=model_cfg.get('batch_size'))
+    parser.add_argument('--learning-rate', type=float, default=model_cfg.get('learning_rate'))
+    parser.add_argument('--n-hidden', type=int, default=model_cfg.get('n_hidden'))
+    parser.add_argument('--k', type=int, default=model_cfg.get('k'))
     parser.add_argument('--model-path', type=str, default=os.path.join(OUTPUT_DIR, 'rbm_best_model.pth'))
     args = parser.parse_args()
     main(
