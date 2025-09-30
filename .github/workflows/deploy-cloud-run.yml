@@ -20,20 +20,18 @@ jobs:
       - name: Set branch variables
         id: vars
         run: |
-          # determine branch: prefer workflow_dispatch input, else event ref
           if [ -n "${{ github.event.inputs.branch }}" ]; then
             BRANCH="${{ github.event.inputs.branch }}"
           else
             BRANCH="${GITHUB_REF#refs/heads/}"
           fi
-          # sanitize branch for service/image names (lowercase, replace / and _ with -, remove invalid chars)
           SAFE_BRANCH=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | tr '/_' '-' | sed 's/[^a-z0-9-]//g' | cut -c1-50)
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "safe_branch=$SAFE_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Check required secrets and variables
         run: |
-          echo "Checking presence of required secrets/variables (values are not shown)..."
+          echo "Checking presence of required secrets/variables..."
           missing=0
           check_required() {
             if [ -z "$1" ]; then
@@ -43,39 +41,20 @@ jobs:
               echo "  $2: SET"
             fi
           }
-          check_optional() {
-            if [ -z "$1" ]; then
-              echo "  $2: MISSING (optional)"
-            else
-              echo "  $2: SET (optional)"
-            fi
-          }
-
           check_required "${{ secrets.GCP_SA_KEY }}" "GCP_SA_KEY"
-          check_required "${{ secrets.GCP_PROJECT }}" "GCP_PROJECT"
-          check_required "${{ secrets.CLOUD_RUN_REGION }}" "CLOUD_RUN_REGION"
-          check_required "${{ secrets.CLOUD_RUN_SERVICE }}" "CLOUD_RUN_SERVICE"
-          check_required "${{ secrets.MODEL_URI }}" "MODEL_URI"
-          check_required "${{ secrets.METADATA_URI }}" "METADATA_URI"
-          check_required "${{ secrets.ANIME_CSV_URI }}" "ANIME_CSV_URI"
-          check_required "${{ secrets.USER_REVIEW_CSV_URI }}" "USER_REVIEW_CSV_URI"
-          # Optional Docker Hub credentials
-          check_optional "${{ secrets.DOCKERHUB_USERNAME }}" "DOCKERHUB_USERNAME"
-          check_optional "${{ secrets.DOCKERHUB_TOKEN }}" "DOCKERHUB_TOKEN"
+          check_required "${{ vars.GCP_PROJECT }}" "GCP_PROJECT"
+          check_required "${{ vars.CLOUD_RUN_REGION }}" "CLOUD_RUN_REGION"
+          check_required "${{ vars.CLOUD_RUN_SERVICE }}" "CLOUD_RUN_SERVICE"
+          check_required "${{ vars.MODEL_URI }}" "MODEL_URI"
+          check_required "${{ vars.METADATA_URI }}" "METADATA_URI"
+          check_required "${{ vars.ANIME_CSV_URI }}" "ANIME_CSV_URI"
+          check_required "${{ vars.USER_REVIEW_CSV_URI }}" "USER_REVIEW_CSV_URI"
 
           echo ""
           if [ "$missing" -ne 0 ]; then
             echo "One or more required secrets/variables are missing. Failing the job."
-            echo "Set secrets at: https://github.com/<owner>/<repo>/settings/secrets and variables → Actions"
             exit 1
-          else
-            echo "All required secrets/variables are present."
           fi
-
-          echo ""
-          echo "Notes:"
-          echo " - If DOCKERHUB_* are set, the workflow will push to Docker Hub instead of Artifact Registry."
-          echo " - This step does NOT expose secret values; it only shows presence/absence."
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
@@ -83,39 +62,25 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set project
-        run: gcloud config set project ${{ secrets.GCP_PROJECT }}
+        run: gcloud config set project ${{ vars.GCP_PROJECT }}
 
       - name: Configure Docker to use gcloud auth
         run: gcloud auth configure-docker --quiet
 
       - name: Ensure Artifact Registry exists (if using Artifact Registry)
-        if: env.DOCKERHUB_USERNAME == ''
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           gcloud artifacts repositories create anime-images --repository-format=docker --location=${{ secrets.CLOUD_RUN_REGION }} || true
 
-      - name: Build and push Docker image (Artifact Registry or Docker Hub)
+      - name: Build and push Docker image (Artifact Registry)
         id: build-image
         env:
           BRANCH: ${{ steps.vars.outputs.branch }}
           SAFE_BRANCH: ${{ steps.vars.outputs.safe_branch }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           IMAGE_TAG="${SAFE_BRANCH}-${{ github.sha }}"
-          if [ -n "$DOCKERHUB_USERNAME" ]; then
-            # Push to Docker Hub
-            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            IMAGE="${DOCKERHUB_USERNAME}/anime-recommendation-backend:${IMAGE_TAG}"
-            docker build -t "$IMAGE" -f api/Dockerfile .
-            docker push "$IMAGE"
-          else
-            # Push to Artifact Registry (default)
-            IMAGE="${{ secrets.CLOUD_RUN_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/anime-images/anime-recommendation-backend:${IMAGE_TAG}"
-            docker build -t "$IMAGE" -f api/Dockerfile .
-            docker push "$IMAGE"
-          fi
+          IMAGE="${{ vars.CLOUD_RUN_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/animereco-images/anime-recommendation-backend:${IMAGE_TAG}"
+          docker build -t "$IMAGE" -f api/Dockerfile .
+          docker push "$IMAGE"
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
       - name: Deploy to Cloud Run (per-branch service)
@@ -123,8 +88,7 @@ jobs:
           BRANCH: ${{ steps.vars.outputs.branch }}
           SAFE_BRANCH: ${{ steps.vars.outputs.safe_branch }}
         run: |
-          # derive service name: use base service for master, otherwise suffix with branch
-          BASE_SERVICE="${{ secrets.CLOUD_RUN_SERVICE }}"
+          BASE_SERVICE="${{ vars.CLOUD_RUN_SERVICE }}"
           if [ "$BRANCH" = "master" ]; then
             SERVICE_NAME="$BASE_SERVICE"
           else
@@ -135,11 +99,11 @@ jobs:
 
           gcloud run deploy "$SERVICE_NAME" \
             --image "$IMAGE" \
-            --region ${{ secrets.CLOUD_RUN_REGION }} \
+            --region ${{ vars.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --memory ${MEMORY:-4Gi} \
             --port 8000 \
             --timeout ${TIMEOUT:-10m} \
             --quiet \
-            --set-env-vars MODEL_URI=${{ secrets.MODEL_URI }},METADATA_URI=${{ secrets.METADATA_URI }},ANIME_CSV_URI=${{ secrets.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ secrets.USER_REVIEW_CSV_URI }}
+            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ secrets.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ secrets.USER_REVIEW_CSV_URI }}
