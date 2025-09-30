@@ -63,7 +63,7 @@ anime_metadata: dict[str, Any] = {}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-ratings = None
+ratings_df = None
 anime_df = None
 user_anime = None
 anime_ids = None
@@ -71,19 +71,19 @@ rbm = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ratings, anime_df, user_anime, anime_ids, rbm, anime_metadata
+    global ratings_df, anime_df, user_anime, anime_ids, rbm, anime_metadata
     try:
-        ratings, anime_df = load_anime_dataset()
+        ratings_df, anime_df = load_anime_dataset()
     except Exception as e:
         raise RuntimeError(f"Failed to load dataset: {e}")
 
     try:
-        anime_ids_list, filtered_ratings = filter_data(
-            ratings,
+        active_anime, active_ratings = filter_data(
+            ratings_df,
             min_likes_user=MIN_LIKES_USER,
             min_likes_anime=MIN_LIKES_ANIME
         )
-        anime_ids = list(anime_ids_list) if anime_ids_list is not None else []
+        anime_ids = list(active_anime) if active_anime is not None else []
     except Exception as e:
         raise RuntimeError(f"Failed to preprocess data: {e}")
 
@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Failed to create RBM instance: {e}")
 
     try:
-        if MODEL_URI and (MODEL_URI.startswith("http://") or MODEL_URI.startswith("https://")):
+        if MODEL_URI:
             try:
                 model_path = download_to_cache(MODEL_URI)
                 if model_path.exists() and rbm is not None:
@@ -127,14 +127,12 @@ async def lifespan(app: FastAPI):
                 else:
                     raise FileNotFoundError(f"Model path {model_path} does not exist or RBM not created; starting without model.")
             except Exception as e:
-                raise RuntimeError(f"Failed to download model from {MODEL_URI}: {e}")
-        else:
-            raise RuntimeError("MODEL_URI not provided or not an http(s) URL; skipping model load (no local fallback).")
+                raise RuntimeError(f"Failed to download/load model from {MODEL_URI}: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to load model from {MODEL_URI}: {e}")
 
     try:
-        if METADATA_URI and (METADATA_URI.startswith("http://") or METADATA_URI.startswith("https://")):
+        if METADATA_URI:
             try:
                 metadata_path = download_to_cache(METADATA_URI)
                 if metadata_path.exists():
@@ -143,9 +141,7 @@ async def lifespan(app: FastAPI):
                 else:
                     raise FileNotFoundError(f"Metadata path {metadata_path} does not exist after download.")
             except Exception as e:
-                raise RuntimeError(f"Failed to download metadata from {METADATA_URI}: {e}")
-        else:
-            raise RuntimeError("METADATA_URI not provided or not an http(s) URL; skipping metadata load (no local fallback).")
+                raise RuntimeError(f"Failed to download/load metadata from {METADATA_URI}: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to load metadata from {METADATA_URI}: {e}")
 
@@ -207,16 +203,26 @@ async def health():
 
     try:
         if anime_df is not None and len(anime_df) > 0:
-            health_status["services"]["data"] = {
+            health_status["services"]["dataset"] = {
                 "status": "ok",
                 "anime_count": len(anime_df),
-                "user_count": len(user_anime) if user_anime is not None else 0
+                "rating_count": len(ratings_df) 
             }
         else:
-            health_status["services"]["data"] = {"status": "error", "error": "Data not loaded"}
+            health_status["services"]["dataset"] = {"status": "error", "error": "Dataset not loaded"}
             health_status["status"] = "degraded"
     except Exception as e:
-        health_status["services"]["data"] = {"status": "error", "error": str(e)}
+        health_status["services"]["dataset"] = {"status": "error", "error": str(e)}
+        health_status["status"] = "degraded"
+    
+    try:
+        if anime_metadata is not None and len(anime_metadata) > 0:
+            health_status["services"]["metadata"] = {"status": "ok", "entry_count": len(anime_metadata)}
+        else:
+            health_status["services"]["metadata"] = {"status": "error", "error": "Metadata not loaded"}
+            health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["services"]["metadata"] = {"status": "error", "error": str(e)}
         health_status["status"] = "degraded"
 
     return health_status
