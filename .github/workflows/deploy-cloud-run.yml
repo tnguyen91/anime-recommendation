@@ -69,7 +69,7 @@ jobs:
 
       - name: Ensure Artifact Registry exists (if using Artifact Registry)
         run: |
-          gcloud artifacts repositories create anime-images --repository-format=docker --location=${{ secrets.CLOUD_RUN_REGION }} || true
+          gcloud artifacts repositories create anime-images --repository-format=docker --location=${{ vars.CLOUD_RUN_REGION }} || true
 
       - name: Build and push Docker image (Artifact Registry)
         id: build-image
@@ -106,4 +106,4 @@ jobs:
             --port 8000 \
             --timeout ${TIMEOUT:-10m} \
             --quiet \
-            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ secrets.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ secrets.USER_REVIEW_CSV_URI }}
+            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }}
