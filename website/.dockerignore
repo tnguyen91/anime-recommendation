@@ -1,0 +1,26 @@
+# Ignore README and documentation
+README.md
+
+# Ignore any development files
+*.md
+.git
+.gitignore
+
+# Ignore node_modules if you add npm later
+node_modules
+npm-debug.log*
+
+# Ignore temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Ignore editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Ignore logs
+*.log
