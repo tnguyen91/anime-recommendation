@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnimeReco - AI-Powered Anime Recommendations</title>
+    <meta name="description" content="Discover your next favorite anime with AI-powered recommendations based on your preferences." />
+
+    <!-- Theme and Icons -->
+    <meta name="theme-color" content="#6366F1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="./assets/placeholder.svg" />
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AnimeReco - AI-Powered Anime Recommendations" />
+    <meta property="og:description" content="Discover your next favorite anime with AI-powered recommendations based on your preferences." />
+    <meta property="og:site_name" content="AnimeReco" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AnimeReco - AI-Powered Anime Recommendations" />
+    <meta name="twitter:description" content="Discover your next favorite anime with AI-powered recommendations based on your preferences." />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <h1 class="brand">Anime<span>Reco</span></h1>
+        <nav aria-label="Primary">
+          <a href="#search" class="nav-link">Search</a>
+          <a href="#favorites" class="nav-link">Favorites</a>
+          <a href="#recommended" class="nav-link">Recommended</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- Search -->
+      <section id="search" class="card">
+        <h2>Search Anime</h2>
+        <div class="searchbar">
+          <label for="search-input" class="sr-only">Search for an anime</label>
+          <input id="search-input" type="text" placeholder="Type to search anime..." autocomplete="off" />
+          <button id="clear-search" class="ghost" aria-label="Clear search">&times;</button>
+        </div>
+        <div id="suggestions" class="suggestions" role="listbox" aria-label="Search suggestions"></div>
+      </section>
+
+      <!-- Favorites & CTA -->
+      <section id="favorites" class="card">
+        <div class="stack-header">
+          <h2>Favorite Anime</h2>
+          <button id="get-recommendations" class="primary" disabled>Get Recommendations</button>
+        </div>
+        <p class="muted" id="favorites-help">Add your favorite anime to get personalized recommendations. Click any anime below to remove it.</p>
+        <ul id="favorites-list" class="chips" aria-live="polite" aria-label="Favorite anime"></ul>
+      </section>
+
+      <!-- Recommended -->
+      <section id="recommended" class="card">
+        <h2>Recommended for You</h2>
+        <div id="recommendations-grid" class="grid"></div>
+      </section>
+    </main>
+
+    <!-- Modal for Details -->
+    <div id="modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-dialog" role="document">
+        <button class="modal-close" aria-label="Close" data-close-modal>&times;</button>
+        <div id="modal-content" class="modal-content" tabindex="0">
+          <!-- dynamic -->
+        </div>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container">
+        <small>&copy; <span id="year"></span> AnimeReco • Built with ❤️</small>
+      </div>
+    </footer>
+
+    <script defer src="./app.js"></script>
+  </body>
+</html>
