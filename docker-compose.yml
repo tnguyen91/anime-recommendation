@@ -5,8 +5,6 @@ services:
       dockerfile: api/Dockerfile
     ports:
       - "8000:8000"
-    networks:
-      - app-network
     environment:
       - MODEL_URI=${MODEL_URI}
       - METADATA_URI=${METADATA_URI}
@@ -17,18 +15,29 @@ services:
       - ./api:/app/api:delegated
       - ./cache:/app/cache:delegated
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    build: ./anime-recommender-ui
+    build:
+      context: ./anime-recommendation-ui
+      dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3000:80"
+    volumes:
+      - ./anime-recommendation-ui/index.html:/usr/share/nginx/html/index.html:ro
+      - ./anime-recommendation-ui/app.js:/usr/share/nginx/html/app.js:ro
+      - ./anime-recommendation-ui/styles.css:/usr/share/nginx/html/styles.css:ro
+      - ./anime-recommendation-ui/assets:/usr/share/nginx/html/assets:ro
     depends_on:
       - backend
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

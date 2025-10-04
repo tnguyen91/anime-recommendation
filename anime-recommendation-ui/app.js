@@ -1,13 +1,4 @@
-/* AnimeReco - Production-ready Vanilla JS SPA
-   Notes:
-   - Expects API endpoints:
-     • GET   /search-anime?query=...           -> returns { results: [{ anime_id, name, image_url, synopsis? }] }
-     • POST  /recommend  body: { liked_anime:[names] } -> returns { recommendations: [{ anime_id, name, image_url, synopsis? }, ...] } (10 items)
-   - All network calls are wrapped with robust error handling and timeouts.
-   - Favorites are persisted in localStorage.
-*/
-
-const API_BASE_URL = 'https://animereco-api-725392014501.us-west1.run.app';
+const API_BASE_URL = window.APP_CONFIG?.API_BASE_URL || 'http://localhost:8000';
 const IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const logger = {
   error: (...args) => console.error(...args),
@@ -19,7 +10,7 @@ const logger = {
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const state = {
-  favorites: loadFavorites(), // Map of name -> { name, title }
+  favorites: loadFavorites(),
   lastQuery: '',
   aborter: null,
   scrolling: false,
@@ -36,7 +27,6 @@ const els = {
   modalContent: $("#modal-content"),
 };
 
-// Utilities
 function loadFavorites(){
   try {
     const raw = localStorage.getItem("favorites");
@@ -45,10 +35,12 @@ function loadFavorites(){
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch(_){ return {}; }
 }
+
 function persistFavorites(){
   localStorage.setItem("favorites", JSON.stringify(state.favorites));
   updateCTA();
 }
+
 function debounce(fn, ms){
   let t;
   return (...args) => {
@@ -56,7 +48,8 @@ function debounce(fn, ms){
     t = setTimeout(() => fn(...args), ms);
   }
 }
-function timeoutFetch(resource, options={}, ms=12000){
+
+function timeoutFetch(resource, options={}, ms=15000){
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), ms);
@@ -66,6 +59,7 @@ function timeoutFetch(resource, options={}, ms=12000){
       .finally(() => clearTimeout(t));
   });
 }
+
 function setLoading(el, isLoading){
   if(isLoading){
     el.setAttribute('data-loading', 'true');
@@ -75,6 +69,7 @@ function setLoading(el, isLoading){
     el.removeAttribute('aria-busy');
   }
 }
+
 function createEl(tag, attrs={}, children=[]){
   const el = document.createElement(tag);
   for (const [k,v] of Object.entries(attrs)){
@@ -90,7 +85,33 @@ function createEl(tag, attrs={}, children=[]){
   return el;
 }
 
-/** Rendering **/
+let focusableElements = [];
+let firstFocusable = null;
+let lastFocusable = null;
+
+function trapFocus(e) {
+  if (e.key !== 'Tab') return;
+  if (e.shiftKey) {
+    if (document.activeElement === firstFocusable) {
+      e.preventDefault();
+      lastFocusable?.focus();
+    }
+  } else {
+    if (document.activeElement === lastFocusable) {
+      e.preventDefault();
+      firstFocusable?.focus();
+    }
+  }
+}
+
+function updateFocusTrap() {
+  const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  focusableElements = Array.from(els.modal.querySelectorAll(focusableSelectors))
+    .filter(el => !el.hasAttribute('disabled'));
+  firstFocusable = focusableElements[0];
+  lastFocusable = focusableElements[focusableElements.length - 1];
+}
+
 function renderFavorites(){
   els.favoritesList.innerHTML = '';
   const entries = Object.values(state.favorites);
@@ -105,16 +126,15 @@ function renderFavorites(){
     els.favoritesList.appendChild(li);
   }
 }
+
 function updateCTA(){
   const hasFavs = Object.keys(state.favorites).length > 0;
   els.getRecsBtn.disabled = !hasFavs;
 }
+
 function renderSuggestions(items){
   els.suggestions.innerHTML = '';
-  if (!items || !items.length){
-    // No suggestions, don't render placeholders to reduce noise
-    return;
-  }
+  if (!items || !items.length) return;
   for (const item of items){
     const key = item.name || item.title;
     const isFav = !!state.favorites[key];
@@ -127,7 +147,6 @@ function renderSuggestions(items){
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleFavorite(item);
-      // Update button state in place
       const nowFav = !!state.favorites[key];
       btn.textContent = nowFav ? 'Remove' : 'Add';
       btn.classList.toggle('remove', nowFav);
@@ -138,41 +157,34 @@ function renderSuggestions(items){
     card.appendChild(img);
     card.appendChild(meta);
     card.appendChild(btn);
-
-    // Click anywhere else to open details
     card.addEventListener('click', () => showDetails(item));
     card.addEventListener('keydown', (e) => { if(e.key==='Enter') showDetails(item); });
-
     els.suggestions.appendChild(card);
   }
 }
+
 function renderRecommendations(items){
   els.grid.innerHTML = '';
   if (!items || !items.length){
     els.grid.innerHTML = '<p class="muted">No recommendations yet. Add at least one favorite anime above, then click "Get Recommendations" to discover new shows you\'ll love!</p>';
     return;
   }
-  // Force exactly two rows of five if 10 results; otherwise responsive grid
   items.slice(0, 10).forEach(item => {
     const card = createEl('article', {class:'card-lg', tabindex:'0', role:'button', 'aria-label': `${item.title}`});
     const img = createEl('img', {src: item.image || './assets/placeholder.svg', alt: `${item.title} cover`});
     const inner = createEl('div', {class:'p'});
     const title = createEl('h3', {}, item.title);
     const sub = createEl('div', {class:'sub'}, item.year ? String(item.year) : (item.genres && item.genres.length ? item.genres.slice(0,2).join(' • ') : ''));
-
     inner.appendChild(title);
     inner.appendChild(sub);
     card.appendChild(img);
     card.appendChild(inner);
-
     card.addEventListener('click', () => showDetails(item));
     card.addEventListener('keydown', (e) => { if(e.key==='Enter') showDetails(item); });
-
     els.grid.appendChild(card);
   });
 }
 
-/** Favorites **/
 function toggleFavorite(item){
   const key = item.name || item.title;
   if (state.favorites[key]){
@@ -184,11 +196,9 @@ function toggleFavorite(item){
   persistFavorites();
 }
 
-/** Details Modal **/
 async function showDetails(item){
   try {
     setLoading(document.body, true);
-    // Note: API doesn't have /anime/:id endpoint, so we use the data we already have
     openModal(renderDetailContent(item));
   } catch(err){
     logger.error('Details error:', err);
@@ -200,11 +210,14 @@ async function showDetails(item){
     setLoading(document.body, false);
   }
 }
+
 function renderDetailContent(data){
   const body = createEl('div', {class:'modal-body'});
   const img = createEl('img', {src: data.image || './assets/placeholder.svg', alt: `${data.title || 'Anime'} cover`});
   const meta = createEl('div');
   meta.appendChild(createEl('h3', {}, data.title || 'Untitled'));
+  if (data.title_english) meta.appendChild(createEl('div', {class:'muted'}, data.title_english));
+  if (data.title_japanese) meta.appendChild(createEl('div', {class:'muted'}, data.title_japanese));
   if (data.year) meta.appendChild(createEl('div', {class:'muted'}, `Year: ${data.year}`));
   if (Array.isArray(data.genres) && data.genres.length) meta.appendChild(createEl('div', {class:'muted'}, `Genres: ${data.genres.join(', ')}`));
   if (data.synopsis) meta.appendChild(createEl('p', {}, data.synopsis));
@@ -212,42 +225,53 @@ function renderDetailContent(data){
   body.appendChild(meta);
   return body;
 }
+
 function openModal(content){
   els.modalContent.innerHTML = '';
   els.modalContent.appendChild(content);
   els.modal.setAttribute('aria-hidden', 'false');
-  // Focus trap entry
-  setTimeout(() => els.modalContent.focus(), 0);
-}
-function closeModal(){
-  els.modal.setAttribute('aria-hidden', 'true');
+  updateFocusTrap();
+  els.modal.addEventListener('keydown', trapFocus);
+  requestAnimationFrame(() => {
+    const closeBtn = els.modal.querySelector('.modal-close');
+    closeBtn?.focus();
+  });
 }
 
-// Modal events
+function closeModal(){
+  els.modal.setAttribute('aria-hidden', 'true');
+  els.modal.removeEventListener('keydown', trapFocus);
+}
+
 $$('[data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && els.modal.getAttribute('aria-hidden') === 'false') closeModal();
 });
 
-/** Search **/
 const doSearch = debounce(async (q) => {
   if (!q || q.trim().length < 2){
     renderSuggestions([]);
     return;
   }
-  // cancel previous (handled via timeoutFetch abort on timeout)
   state.lastQuery = q;
   setLoading(els.suggestions, true);
   try {
     const res = await timeoutFetch(`${API_BASE_URL}/search-anime?query=${encodeURIComponent(q)}`, { headers: { "Accept": "application/json" } });
-    if (!res.ok) throw new Error(`Search failed (${res.status})`);
+    if (!res.ok) {
+      if (res.status === 404) {
+        els.suggestions.innerHTML = '<p class="muted">No anime found matching your search.</p>';
+        return;
+      }
+      throw new Error(`Search failed (${res.status})`);
+    }
     const data = await res.json();
-    // Normalize
     const items = (data.results || [])
       .map(x => ({
         id: x.anime_id,
         name: x.name,
         title: x.name,
+        title_english: x.title_english ?? null,
+        title_japanese: x.title_japanese ?? null,
         image: x.image_url ?? './assets/placeholder.svg',
         year: x.year ?? null,
         genres: x.genre ?? [],
@@ -256,7 +280,10 @@ const doSearch = debounce(async (q) => {
     renderSuggestions(items);
   } catch (err){
     logger.error('Search error:', err);
-    els.suggestions.innerHTML = '<p class="muted">Unable to search at this time. Please check your connection and try again.</p>';
+    const errorMsg = err.name === 'AbortError'
+      ? 'Search timed out. Please try again.'
+      : 'Unable to search. Please check your connection.';
+    els.suggestions.innerHTML = `<p class="muted">${errorMsg}</p>`;
   } finally {
     setLoading(els.suggestions, false);
   }
@@ -271,7 +298,6 @@ els.clearSearch.addEventListener('click', () => {
   els.searchInput.focus();
 });
 
-/** Get Recommendations **/
 els.getRecsBtn.addEventListener('click', async () => {
   const likedAnime = Object.keys(state.favorites);
   if (!likedAnime.length) return;
@@ -282,39 +308,83 @@ els.getRecsBtn.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json', 'Accept':'application/json' },
       body: JSON.stringify({ liked_anime: likedAnime })
     });
-    if (!res.ok) throw new Error(`Recommend failed (${res.status})`);
+    if (!res.ok) {
+      const errorMsg = res.status === 500
+        ? 'Server error. Please try again later.'
+        : `Recommendation failed (${res.status})`;
+      throw new Error(errorMsg);
+    }
     const data = await res.json();
     const items = (data.recommendations || [])
       .map(x => ({
         id: x.anime_id,
         name: x.name,
         title: x.name,
+        title_english: x.title_english ?? null,
+        title_japanese: x.title_japanese ?? null,
         image: x.image_url ?? './assets/placeholder.svg',
         year: x.year ?? null,
         genres: x.genre ?? [],
         synopsis: x.synopsis ?? null,
       }));
     renderRecommendations(items);
-    // Smooth scroll to section
-    document.querySelector('#recommended').scrollIntoView({ behavior: 'smooth', block:'start' });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.querySelector('#recommended')?.scrollIntoView({ behavior: 'smooth', block:'start' });
+      });
+    });
   } catch(err){
     logger.error('Recommendation error:', err);
-    els.grid.innerHTML = '<p class="muted">Unable to generate recommendations at this time. Please check your connection and try again.</p>';
+    const errorMsg = err.name === 'AbortError'
+      ? 'Request timed out. Please try again.'
+      : err.message || 'Unable to generate recommendations. Please try again.';
+    els.grid.innerHTML = `<p class="muted">${errorMsg}</p>`;
   } finally {
     setLoading(els.grid, false);
   }
 });
 
-/** Init **/
 renderFavorites();
 updateCTA();
-$("#year").textContent = new Date().getFullYear();
 
-// Click on favorite chip removes it
-// (handled in renderFavorites)
+if ('IntersectionObserver' in window) {
+  const imageObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+          img.removeAttribute('data-src');
+          imageObserver.unobserve(img);
+        }
+      }
+    });
+  }, { rootMargin: '50px' });
+  window.lazyLoadImage = (img) => imageObserver.observe(img);
+}
 
-// Accessibility: mark loading state via [data-loading] if needed
-const observer = new MutationObserver(() => {
-  // could add aria-busy indicators here per element if desired
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    els.searchInput?.focus();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (!els.getRecsBtn.disabled) {
+      e.preventDefault();
+      els.getRecsBtn.click();
+    }
+  }
 });
-observer.observe(document.body, { attributes:true, subtree:true, attributeFilter:['data-loading'] });
+
+window.addEventListener('online', () => {
+  logger.info('Connection restored');
+});
+window.addEventListener('offline', () => {
+  logger.warn('No internet connection');
+});
+window.addEventListener('error', (e) => {
+  logger.error('Uncaught error:', e.error);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  logger.error('Unhandled promise rejection:', e.reason);
+});

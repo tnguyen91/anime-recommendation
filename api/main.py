@@ -27,17 +27,7 @@ from api.inference.recommender import get_recommendations
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
 
-class Recommendation(BaseModel):
-    anime_id: int
-    name: str
-    image_url: str | None
-    genre: list[str]
-    synopsis: str | None
-
-class RecommendResponse(BaseModel):
-    recommendations: list[Recommendation]
-
-class SearchResult(BaseModel):
+class AnimeResult(BaseModel):
     anime_id: int
     name: str
     title_english: str | None
@@ -46,8 +36,11 @@ class SearchResult(BaseModel):
     genre: list[str]
     synopsis: str | None
 
+class RecommendResponse(BaseModel):
+    recommendations: list[AnimeResult]
+
 class SearchResponse(BaseModel):
-    results: list[SearchResult]
+    results: list[AnimeResult]
 
 cache_env = os.getenv("CACHE_DIR")
 if cache_env:
@@ -244,9 +237,11 @@ async def recommend(request: RecommendRequest):
         response = []
         for _, row in recs.iterrows():
             info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"])) or {}
-            response.append(Recommendation(
+            response.append(AnimeResult(
                 anime_id=int(row["anime_id"]),
                 name=row["name"],
+                title_english="" if pd.isnull(row.get("title_english")) else row.get("title_english", ""),
+                title_japanese="" if pd.isnull(row.get("title_japanese")) else row.get("title_japanese", ""),
                 image_url=info.get("image_url"),
                 genre=info.get("genres", []),
                 synopsis=info.get("synopsis")
@@ -293,7 +288,7 @@ async def search_anime(query: str = ""):
 
             metadata_info = anime_metadata.get(str(normalized_id)) or anime_metadata.get(normalized_id, {})
 
-            results.append(SearchResult(
+            results.append(AnimeResult(
                 anime_id=normalized_id,
                 name="" if pd.isnull(row.get("name")) else row.get("name", ""),
                 title_english="" if pd.isnull(row.get("title_english")) else row.get("title_english", ""),

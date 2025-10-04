@@ -37,4 +37,10 @@ def get_recommendations(
     recommended['score'] = scores[top_indices]
     recommended = recommended.reset_index()
 
-    return recommended[['anime_id', 'name', 'score']]
+    cols = ['anime_id', 'name', 'score']
+    if 'title_english' in recommended.columns:
+        cols.append('title_english')
+    if 'title_japanese' in recommended.columns:
+        cols.append('title_japanese')
+
+    return recommended[cols]
