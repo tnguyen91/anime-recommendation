@@ -1,214 +1,235 @@
-# Anime Recommendation System using Restricted Boltzmann Machines
+# Anime Recommendation System
 
-A machine learning-based anime recommendation system that leverages **Restricted Boltzmann Machines (RBM)** for collaborative filtering. The system provides personalized anime recommendations and includes a full-stack web application with React frontend and FastAPI backend.
+Collaborative filtering recommendation system using Restricted Boltzmann Machines (RBM). Includes FastAPI backend, web UI, and Google Cloud Run deployment.
 
-## Features
+## Tech Stack
 
-- **Machine Learning**: RBM-based collaborative filtering model implemented with PyTorch
-- **GPU Acceleration**: Automatic CUDA detection and utilization for training
-- **Comprehensive Evaluation**: Precision@K, MAP@K, and NDCG@K metrics
-- **Web Interface**: Modern React frontend with search and recommendation features
-- **REST API**: FastAPI backend with comprehensive error handling and validation
-- **Production Ready**: Docker containerization and Docker Compose orchestration
-- **Hyperparameter Tuning**: Automated grid search with CSV result logging
-- **Data Visualization**: Training metrics plots and recommendation exports
+- Python 3.12, PyTorch 2.2.2, FastAPI 0.116.2
+- Docker, Google Cloud Run, GitHub Actions
+- Vanilla JS frontend
 
-## Technology Stack
-
-**Backend & ML:**
-- Python 3.12
-- PyTorch (RBM implementation)
-- FastAPI (REST API)
-- pandas, NumPy (data processing)
-- Gunicorn (production WSGI server)
-
-**Frontend:**
-- React 18
-- Modern JavaScript (ES6+)
-- CSS3 with custom styling
-
-**DevOps & Deployment:**
-- Docker & Docker Compose
-- Nginx (reverse proxy)
-- Automated dataset downloading via KaggleHub
-
-## Dataset & Preprocessing
-
-**Source**: [MyAnimeList Anime and User Interactions](https://www.kaggle.com/datasets/bsurya27/myanimelists-anime-and-user-anime-interactions)
-
-**Data Pipeline:**
-- Raw ratings converted to binary implicit feedback (liked = rating ≥ 7)
-- Quality filters applied:
-  - Users: minimum 100 liked anime
-  - Anime: minimum 50 total likes
-  - Content filtering: adult/hentai genres removed
-- Final format: sparse user-item interaction matrix
-
-## Machine Learning Model
-
-**Restricted Boltzmann Machine (RBM):**
-- **Input**: Binary user-item preference vectors
-- **Architecture**: Visible units (anime) ↔ Hidden units (latent factors)
-- **Training**: Contrastive Divergence with Adam optimizer
-- **Evaluation**: Top-K ranking metrics on held-out interactions
-- **Features**: Early stopping, GPU acceleration
-
-## Project Structure (Refactored for Multi-Model Support)
-
-```
-anime-recommendation/
-├── docker-compose.yml
-├── requirements.txt
-├── README.md
-├── data/
-│   ├── datasets/
-│   └── anime_metadata.json
-├── anime-recommender-ui/        # React frontend
-│   └── ...
-├── api/                        # FastAPI application layer
-│   ├── Dockerfile
-│   ├── __init__.py
-│   └── main.py
-├── rbm/                        # RBM implementation
-│   ├── main.py
-│   ├── hyperparameter_tuning.py
-│   ├── build_metadata_cache.py
-│   ├── config.yaml
-│   ├── constants.py
-│   ├── __init__.py
-│   ├── src/
-│   │   ├── __init__.py
-│   │   ├── data_loader.py
-│   │   ├── evaluate.py
-│   │   ├── model.py
-│   │   ├── train.py
-│   │   └── utils.py
-│   └── out/
-```
-
-## Installation
-
-### 1. Clone the repo
-```bash
-git clone https://github.com/tnguyen91/anime-recommendation.git
-cd anime-recommendation
-```
-### 2. Set up a virtual environment
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-### 3. Install Python backend dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Install frontend dependencies
-```bash
-cd anime-recommender-ui
-npm install
-```
-### 5. (Optional) Train the model
-```bash
-python rbm/main.py --train
-```
-### 6. (Optional) Hyperparameter tuning
-```bash
-python rbm/hyperparameter_tuning.py
-```
-
----
-
-## Quickstart (with Docker)
-
-Run backend (FastAPI) and frontend (React UI) together using Docker Compose:
+## Quickstart
 
 ```bash
 docker-compose up --build
 ```
 
-  - Frontend: http://localhost:3000
-  - API: http://localhost:5000
+- Frontend: http://localhost:8080
+- API: http://localhost:8000
+- Docs: http://localhost:8000/docs
 
----
+## Project Structure
 
-## Running Locally
-
-### Start backend (FastAPI):
-```bash
-python -m api.main
 ```
-### Start frontend (Next.js UI) in a new terminal:
-```bash
-cd anime-recommender-ui
-npm run dev
+anime-recommendation/
+├── .github/
+│   └── workflows/
+│       ├── deploy-api-cloud-run.yml
+│       └── deploy-ui-cloud-run.yml
+├── api/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── main.py
+│   ├── config.py
+│   ├── inference/
+│   │   ├── model.py
+│   │   ├── recommender.py
+│   │   ├── data_loader.py
+│   │   ├── preprocess.py
+│   │   └── downloads.py
+│   └── tests/
+│       └── test_api.py
+├── rbm/
+│   ├── main.py
+│   ├── config.yaml
+│   ├── constants.py
+│   ├── hyperparameter_tuning.py
+│   ├── build_metadata_cache.py
+│   └── src/
+│       ├── model.py
+│       ├── train.py
+│       ├── evaluate.py
+│       ├── data_loader.py
+│       └── utils.py
+├── anime-recommendation-ui/
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── index.html
+│   ├── app.js
+│   ├── config.js
+│   └── styles.css
+├── data/
+├── out/
+├── docker-compose.yml
+├── .env
+└── README.md
 ```
 
----
+## API Endpoints
 
-## Config File
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/recommend` | POST | Get recommendations |
+| `/search-anime` | GET | Search anime |
 
-Training settings now live in `rbm/config.yaml` (the legacy root `config.yaml` was removed to avoid confusion):
+**Request Example:**
+```bash
+curl -X POST http://localhost:8000/recommend \
+  -H "Content-Type: application/json" \
+  -d '{"liked_anime": ["Steins;Gate", "Death Note"]}'
+```
+
+**Response:**
+```json
+{
+  "recommendations": [
+    {
+      "anime_id": 9253,
+      "name": "Steins;Gate",
+      "title_english": "Steins;Gate",
+      "title_japanese": "シュタインズ・ゲート",
+      "image_url": "https://cdn.myanimelist.net/images/anime/5/73199.jpg",
+      "genre": ["Sci-Fi", "Thriller"],
+      "synopsis": "..."
+    }
+  ]
+}
+```
+
+## Development Setup
+
+### Run API
+```bash
+python3 -m venv venv
+source venv/bin/activate
+cd api && pip install -r requirements.txt
+cd .. && python -m api.main
+```
+
+### Run Frontend
+```bash
+cd anime-recommendation-ui
+python -m http.server 8080
+```
+
+### Environment Variables
+
+Required in `.env`:
+```env
+MODEL_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/rbm_best_model.pth
+METADATA_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/anime_metadata.json
+ANIME_CSV_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/Anime.csv
+USER_REVIEW_CSV_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/User-AnimeReview.csv
+CACHE_DIR=/app/cache
+ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+```
+
+## Model Training
+
+### Train Model
+```bash
+python rbm/main.py --train
+```
+
+Output: `rbm/out/rbm_best_model.pth`
+
+### Hyperparameter Tuning
+```bash
+python rbm/hyperparameter_tuning.py
+```
+
+Output: `rbm/out/tuning_results.csv`
+
+### Configuration
+
+**API** ([api/config.py](api/config.py)):
+```python
+RATING_THRESHOLD = 7
+DEFAULT_TOP_N = 10
+MIN_LIKES_USER = 100
+MIN_LIKES_ANIME = 50
+N_HIDDEN = 256
+```
+
+**Training** ([rbm/config.yaml](rbm/config.yaml)):
 ```yaml
 model:
-  n_hidden: 1024
+  n_hidden: 256
   learning_rate: 0.001
-  batch_size: 32
+  batch_size: 16
   epochs: 30
-  k: 10
+  k: 10  # Top-K for evaluation metrics
+
 data:
   holdout_ratio: 0.1
   min_likes_user: 100
   min_likes_anime: 50
-paths:
-  model_path: out/rbm_best_model.pth
 ```
----
 
-## Environment Variables
+## Dataset
 
-The frontend expects a `.env` file in the `anime-recommender-ui/` directory.
+Source: [MyAnimeList Dataset](https://www.kaggle.com/datasets/bsurya27/myanimelists-anime-and-user-anime-interactions)
 
-1. Go to the frontend directory:
-    ```bash
-    cd anime-recommender-ui/
-    ```
+Preprocessing:
+- Binary implicit feedback (rating ≥ 7 = liked)
+- User threshold: ≥100 liked anime
+- Anime threshold: ≥50 likes
+- Hentai/adult content filtered
 
-2. Copy the example environment file:
-    ```bash
-    cp .env.example .env
-    ```
+## Model
 
-3. Edit `.env` and set the API URL as needed:
+**RBM Architecture:**
+- Input: Binary user-anime interaction vectors
+- Hidden units: 256 (latent factors)
+- Training: Contrastive Divergence (CD-1)
+- Optimizer: Adam (lr=0.001)
 
-    - For Docker Compose:
-      ```env
-      NEXT_PUBLIC_API_URL=http://backend:5000
-      ```
-    - For local development:
-      ```env
-      NEXT_PUBLIC_API_URL=http://localhost:5000
-      ```
+**Evaluation Metrics:**
+- Precision@10: 0.1756
+- MAP@10: 0.3639
+- NDCG@10: 0.1967
 
----
+![Training Metrics](out/training_metrics.png)
 
-## Outputs
+## Testing
 
-Runtime artifacts are written under the model folder (e.g. `rbm/out/`). Legacy root `out/` may still contain older runs; you can delete it safely once migrated.
+```bash
+cd api
+pytest tests/ -v
+```
 
-- `rbm/out/rbm_best_model.pth` – best saved weights
-- `rbm/out/recommendations.csv` – top-N anime per user + hit flag
-- `rbm/out/training_metrics.png` – training loss and evaluation metrics
-- `rbm/out/tuning_results.csv` – hyperparameter search log (if tuning run)
+Coverage:
+- Health checks
+- Input validation
+- Recommendation generation
+- Metadata enrichment
 
----
+## Deployment
 
-## Evaluation Metrics
+### Google Cloud Run
 
-| Metric       | Description |
-|--------------|-------------|
-| **Precision@K** | Measures how many of the top K recommended anime were actually relevant (i.e., liked by the user). |
-| **MAP@K**       | Mean Average Precision at K: captures both correctness and order of recommendations. |
-| **NDCG@K**      | Normalized Discounted Cumulative Gain: gives higher weight to relevant items ranked higher. |
+Automated via GitHub Actions (`.github/workflows/deploy-api-cloud-run.yml`).
 
-![Training Metrics](rbm/out/training_metrics.png)
+**Required Secrets:**
+- `GCP_SA_KEY`
+
+**Required Variables:**
+- `GCP_PROJECT`, `CLOUD_RUN_REGION`, `CLOUD_RUN_SERVICE`
+- `MODEL_URI`, `METADATA_URI`, `ANIME_CSV_URI`, `USER_REVIEW_CSV_URI`
+- `ALLOWED_ORIGINS`
+
+### Manual Docker
+
+```bash
+cd api
+docker build -t anime-api .
+docker run -p 8000:8000 \
+  -e MODEL_URI=<url> \
+  -e METADATA_URI=<url> \
+  anime-api
+```
+
+## License
+
+See [ATTRIBUTION.md](ATTRIBUTION.md) for dataset attribution.
