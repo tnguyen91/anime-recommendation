@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnimeReco - AI-Powered Anime Recommendations</title>
+    <meta name="description" content="Discover your next favorite anime with AI-powered recommendations based on your preferences." />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: http: data:; connect-src 'self' http://localhost:* https://*; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta name="theme-color" content="#6366F1" />
+    <link rel="icon" type="image/png" href="./assets/favicon.png" />
+    <link rel="apple-touch-icon" href="./assets/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <header class="site-header">
+      <div class="container header-inner">
+        <h1 class="brand">Anime<span>Reco</span></h1>
+        <nav aria-label="Primary navigation">
+          <a href="#search" class="nav-link">Search</a>
+          <a href="#favorites" class="nav-link">Favorites</a>
+          <a href="#recommended" class="nav-link">Recommended</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content" class="container">
+      <section id="search" class="card">
+        <h2>Search Anime</h2>
+        <div class="searchbar">
+          <label for="search-input" class="sr-only">Search for an anime</label>
+          <input id="search-input" type="text" placeholder="Type to search anime..." autocomplete="off" />
+          <button id="clear-search" class="ghost" aria-label="Clear search">&times;</button>
+        </div>
+        <div id="suggestions" class="suggestions"></div>
+      </section>
+
+      <section id="favorites" class="card">
+        <div class="stack-header">
+          <h2>Favorite Anime</h2>
+          <button id="get-recommendations" class="primary" disabled>Get Recommendations</button>
+        </div>
+        <ul id="favorites-list" class="chips"></ul>
+      </section>
+
+      <section id="recommended" class="card">
+        <h2>Recommended for You</h2>
+        <div id="recommendations-grid" class="grid"></div>
+      </section>
+    </main>
+
+    <div id="modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-dialog">
+        <button class="modal-close" aria-label="Close" data-close-modal>&times;</button>
+        <div id="modal-content" class="modal-content" tabindex="-1"></div>
+      </div>
+    </div>
+
+    <script>
+      window.APP_CONFIG = {
+        API_BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:8000'
+          : window.location.origin
+      };
+    </script>
+    <script defer src="./app.js"></script>
+  </body>
+</html>
