@@ -64,7 +64,7 @@ jobs:
         run: |
           IMAGE_TAG="master-${{ github.sha }}"
           IMAGE="${{ vars.CLOUD_RUN_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/animereco-images/anime-recommendation-backend:${IMAGE_TAG}"
-          docker build -t "$IMAGE" -f Dockerfile api/
+          docker build -t "$IMAGE" -f api/Dockerfile api/
           docker push "$IMAGE"
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
