@@ -2,15 +2,11 @@ name: Deploy UI to Google Cloud Run
 
 on:
   push:
-    branches: [ '**' ]
+    branches: [ 'master' ]
     paths:
       - 'anime-recommendation-ui/**'
       - '.github/workflows/deploy-ui-cloud-run.yml'
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Optional branch to deploy (overrides push ref)'
-        required: false
 
 jobs:
   build-and-deploy:
@@ -19,18 +15,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set branch variables
-        id: vars
-        run: |
-          if [ -n "${{ github.event.inputs.branch }}" ]; then
-            BRANCH="${{ github.event.inputs.branch }}"
-          else
-            BRANCH="${GITHUB_REF#refs/heads/}"
-          fi
-          SAFE_BRANCH=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | tr '/_' '-' | sed 's/[^a-z0-9-]//g' | cut -c1-50)
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "safe_branch=$SAFE_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Check required secrets and variables
         run: |
@@ -71,30 +55,18 @@ jobs:
 
       - name: Build and push Docker image
         id: build-image
-        env:
-          BRANCH: ${{ steps.vars.outputs.branch }}
-          SAFE_BRANCH: ${{ steps.vars.outputs.safe_branch }}
         run: |
-          IMAGE_TAG="${SAFE_BRANCH}-${{ github.sha }}"
+          IMAGE_TAG="master-${{ github.sha }}"
           IMAGE="${{ vars.CLOUD_RUN_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/animereco-images/anime-recommendation-ui:${IMAGE_TAG}"
           docker build -t "$IMAGE" -f anime-recommendation-ui/Dockerfile anime-recommendation-ui/
           docker push "$IMAGE"
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Cloud Run (per-branch service)
-        env:
-          BRANCH: ${{ steps.vars.outputs.branch }}
-          SAFE_BRANCH: ${{ steps.vars.outputs.safe_branch }}
+      - name: Deploy to Cloud Run
         run: |
-          if [ "$BRANCH" = "master" ]; then
-            SERVICE_NAME="animereco-ui"
-          else
-            SERVICE_NAME="animereco-ui-${SAFE_BRANCH}"
-          fi
-
           IMAGE="${{ steps.build-image.outputs.image }}"
 
-          gcloud run deploy "$SERVICE_NAME" \
+          gcloud run deploy animereco-ui \
             --image "$IMAGE" \
             --region ${{ vars.CLOUD_RUN_REGION }} \
             --platform managed \
