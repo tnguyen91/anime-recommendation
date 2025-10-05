@@ -36,6 +36,7 @@ jobs:
           check_required "${{ vars.METADATA_URI }}" "METADATA_URI"
           check_required "${{ vars.ANIME_CSV_URI }}" "ANIME_CSV_URI"
           check_required "${{ vars.USER_REVIEW_CSV_URI }}" "USER_REVIEW_CSV_URI"
+          check_required "${{ vars.ALLOWED_ORIGINS }}" "ALLOWED_ORIGINS"
 
           echo ""
           if [ "$missing" -ne 0 ]; then
@@ -63,7 +64,7 @@ jobs:
         run: |
           IMAGE_TAG="master-${{ github.sha }}"
           IMAGE="${{ vars.CLOUD_RUN_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT }}/animereco-images/anime-recommendation-backend:${IMAGE_TAG}"
-          docker build -t "$IMAGE" -f api/Dockerfile .
+          docker build -t "$IMAGE" -f Dockerfile api/
           docker push "$IMAGE"
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
@@ -80,4 +81,4 @@ jobs:
             --port 8000 \
             --timeout ${TIMEOUT:-10m} \
             --quiet \
-            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }}
+            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }},ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}

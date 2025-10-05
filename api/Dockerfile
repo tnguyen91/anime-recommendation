@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip install --upgrade pip setuptools wheel
 
-COPY api/requirements.txt ./requirements.txt
+COPY requirements.txt ./requirements.txt
 RUN pip wheel --wheel-dir=/wheels --no-cache-dir -r requirements.txt
 
 
@@ -29,19 +29,17 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /wheels /wheels
-COPY api/requirements.txt ./requirements.txt
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-index --find-links=/wheels --no-cache-dir -r requirements.txt
 
-COPY api ./api
+COPY . ./api
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
-
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
 ENV PORT=8000

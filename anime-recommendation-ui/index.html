@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AnimeReco - AI-Powered Anime Recommendations</title>
     <meta name="description" content="Discover your next favorite anime with AI-powered recommendations based on your preferences." />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: http: data:; connect-src 'self' http://localhost:* https://*; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: http: data:; connect-src 'self' http://localhost:* https://*; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta http-equiv="X-Frame-Options" content="DENY" />
     <meta name="theme-color" content="#6366F1" />
@@ -63,13 +63,7 @@
       </div>
     </div>
 
-    <script>
-      window.APP_CONFIG = {
-        API_BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? 'http://localhost:8000'
-          : 'https://animereco-api-725392014501.us-west1.run.app'
-      };
-    </script>
+    <script defer src="./config.js"></script>
     <script defer src="./app.js"></script>
   </body>
 </html>
