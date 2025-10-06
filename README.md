@@ -177,6 +177,10 @@ Preprocessing:
 - Anime threshold: ≥50 likes
 - Hentai/adult content filtered
 
+Processed Dataset:
+- User-anime matrix: 1,922 users × 12,347 anime
+- Filtered interactions: 855,449 ratings (from 15.3M raw)
+
 ## Model
 
 **RBM Architecture:**
