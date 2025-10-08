@@ -6,3 +6,11 @@ pandas==2.3.2
 kagglehub==0.3.13
 numpy==1.26.4
 torch==2.2.2+cpu
+
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
