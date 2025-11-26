@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from api.database import Base
@@ -17,7 +17,7 @@ class User(Base):
     
     is_active = Column(Boolean, default=True, nullable=False)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     favorites = relationship("UserFavorite", back_populates="user", cascade="all, delete-orphan")
     recommendations = relationship("RecommendationHistory", back_populates="user", cascade="all, delete-orphan")
@@ -35,7 +35,7 @@ class UserFavorite(Base):
     
     anime_id = Column(Integer, nullable=False, index=True)
 
-    added_at = Column(DateTime, default=datetime.timezone.utc, nullable=False)
+    added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User", back_populates="favorites")
     
@@ -52,7 +52,7 @@ class RecommendationHistory(Base):
     
     anime_id = Column(Integer, nullable=False, index=True)
 
-    recommended_at = Column(DateTime, default=datetime.timezone.utc, nullable=False)
+    recommended_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     clicked = Column(Boolean, default=False, nullable=False)
     
