@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 import torch
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -37,9 +37,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Rate limiter configuration
-# Uses client IP address to track request counts
 limiter = Limiter(key_func=get_remote_address)
+
+v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -266,7 +266,7 @@ async def health():
 
     return health_status
 
-@app.post("/recommend", response_model=RecommendResponse, tags=["Recommendations"])
+@v1_router.post("/recommend", response_model=RecommendResponse, tags=["Recommendations"])
 @limiter.limit("30/minute")  # 30 requests per minute per IP
 async def recommend(request: Request, body: RecommendRequest):
     liked_anime = body.liked_anime
@@ -301,7 +301,7 @@ async def recommend(request: Request, body: RecommendRequest):
         logger.exception(f"Error generating recommendations for anime: {liked_anime}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
 
-@app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
+@v1_router.get("/search-anime", response_model=SearchResponse, tags=["Search"])
 @limiter.limit("60/minute")  # 60 requests per minute per IP
 async def search_anime(request: Request, query: str = "", limit: int = 20, offset: int = 0):
     query = (query or "").strip()
@@ -362,6 +362,8 @@ async def search_anime(request: Request, query: str = "", limit: int = 20, offse
     except Exception as e:
         logger.exception(f"Error searching anime with query: {query}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while searching anime")
+
+app.include_router(v1_router)
 
 if __name__ == "__main__":
     uvicorn.run(
