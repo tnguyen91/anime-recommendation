@@ -16,7 +16,7 @@ import api.main as api
 def client():
     with (
         patch('api.main.load_anime_dataset') as mock_load_data,
-        patch('api.main.preprocess_data') as mock_preprocess,
+        patch('api.main.filter_data') as mock_filter,
         patch('api.main.RBM') as mock_rbm,
     ):
         mock_ratings = pd.DataFrame({'user_id': [], 'anime_id': [], 'score': []})
@@ -29,7 +29,7 @@ def client():
         mock_user_anime = pd.DataFrame(columns=[1, 2])
 
         mock_load_data.return_value = (mock_ratings, mock_anime_df)
-        mock_preprocess.return_value = (mock_user_anime, mock_ratings)
+        mock_filter.return_value = (list(mock_user_anime.columns), mock_ratings)
 
         rbm_instance = MagicMock()
         rbm_instance.n_visible = len(mock_user_anime.columns)
@@ -39,7 +39,7 @@ def client():
 
         with TestClient(api.app) as test_client:
             api.anime_df = mock_anime_df.copy()
-            api.ratings = mock_ratings.copy()
+            api.ratings_df = mock_ratings.copy()
             api.user_anime = mock_user_anime.copy()
             api.anime_ids = list(mock_user_anime.columns)
             api.rbm = rbm_instance
@@ -64,27 +64,36 @@ def test_health_endpoint(client):
     data = response.json()
     assert data["status"] in {"ok", "degraded"}
     assert "model" in data["services"]
-    assert "data" in data["services"]
+    assert "dataset" in data["services"]
 
 def test_search_anime_empty_query(client):
     """Empty query string returns no results"""
     response = client.get("/search-anime?query=")
     assert response.status_code == 200
-    assert response.json() == {"results": []}
+    payload = response.json()
+    assert payload["results"] == []
+    assert payload["total"] == 0
+    assert payload["limit"] == 20
+    assert payload["offset"] == 0
 
 
 def test_search_anime_missing_query(client):
     """Omitted query parameter defaults to empty string."""
     response = client.get("/search-anime")
     assert response.status_code == 200
-    assert response.json() == {"results": []}
+    payload = response.json()
+    assert payload["results"] == []
+    assert payload["total"] == 0
 
 def test_search_anime_valid_query(client):
-    """Query returns enriched metadata."""
+    """Query returns enriched metadata with pagination."""
     response = client.get("/search-anime?query=sample")
     assert response.status_code == 200
     payload = response.json()
     assert payload["results"]
+    assert payload["total"] >= 1
+    assert "limit" in payload
+    assert "offset" in payload
     first = payload["results"][0]
     assert first["anime_id"] == 1
     assert first["image_url"] == "https://example.com/sample.jpg"
@@ -115,6 +124,23 @@ def test_search_anime_invalid_chars(client):
     response = client.get("/search-anime?query=<script>")
     assert response.status_code == 400
     assert "Invalid characters" in response.json()["detail"]
+
+
+def test_search_anime_pagination(client):
+    """Test pagination parameters work correctly."""
+    response = client.get("/search-anime?query=sample&limit=1")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["limit"] == 1
+    assert len(payload["results"]) <= 1
+    
+    response = client.get("/search-anime?query=sample&limit=200")
+    assert response.status_code == 400
+    assert "Limit must be between 1 and 100" in response.json()["detail"]
+    
+    response = client.get("/search-anime?query=sample&offset=-1")
+    assert response.status_code == 400
+    assert "Offset must be non-negative" in response.json()["detail"]
 
 
 def test_recommend_endpoint_success(client):

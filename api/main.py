@@ -9,8 +9,12 @@ import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from api.config import (
     DEFAULT_TOP_N,
@@ -32,6 +36,10 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
+
+# Rate limiter configuration
+# Uses client IP address to track request counts
+limiter = Limiter(key_func=get_remote_address)
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -176,6 +184,9 @@ app = FastAPI(
     lifespan=lifespan 
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:8080,http://127.0.0.1:8080"
@@ -256,8 +267,9 @@ async def health():
     return health_status
 
 @app.post("/recommend", response_model=RecommendResponse, tags=["Recommendations"])
-async def recommend(request: RecommendRequest):
-    liked_anime = request.liked_anime
+@limiter.limit("30/minute")  # 30 requests per minute per IP
+async def recommend(request: Request, body: RecommendRequest):
+    liked_anime = body.liked_anime
 
     if not liked_anime:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="liked_anime must be a non-empty list")
@@ -290,7 +302,8 @@ async def recommend(request: RecommendRequest):
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
 
 @app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
-async def search_anime(query: str = "", limit: int = 20, offset: int = 0):
+@limiter.limit("60/minute")  # 60 requests per minute per IP
+async def search_anime(request: Request, query: str = "", limit: int = 20, offset: int = 0):
     query = (query or "").strip()
 
     if limit < 1 or limit > 100:
