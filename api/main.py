@@ -1,11 +1,13 @@
 import json
+import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 import pandas as pd
 import torch
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
@@ -23,6 +25,13 @@ from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
 from api.inference.preprocess import filter_data
 from api.inference.recommender import get_recommendations
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -152,9 +161,9 @@ async def lifespan(app: FastAPI):
                 if anime_cache:
                     anime_df = pd.read_csv(anime_cache)
             except Exception as e:
-                print(f"Warning: failed to load cached data: {e}")
+                logger.warning(f"Failed to load cached data: {e}")
     except Exception as e:
-        print(f"Warning: failed to load cache directory: {e}")
+        logger.warning(f"Failed to load cache directory: {e}")
 
     yield
 
@@ -176,6 +185,24 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Accept", "Authorization"],
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests and their response times."""
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    duration = time.time() - start_time
+    
+    if request.url.path not in ["/health", "/"]:
+        logger.info(
+            f"{request.method} {request.url.path} | "
+            f"Status: {response.status_code} | "
+            f"Duration: {duration:.3f}s"
+        )
+    
+    return response
 
 @app.get("/")
 async def root():
@@ -256,6 +283,7 @@ async def recommend(request: RecommendRequest):
         return result
 
     except Exception as e:
+        logger.exception(f"Error generating recommendations for anime: {liked_anime}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
 
 @app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
@@ -306,6 +334,7 @@ async def search_anime(query: str = ""):
         return SearchResponse(results=results)
 
     except Exception as e:
+        logger.exception(f"Error searching anime with query: {query}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while searching anime")
 
 if __name__ == "__main__":
