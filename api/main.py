@@ -50,6 +50,9 @@ class RecommendResponse(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[AnimeResult]
+    total: int
+    limit: int
+    offset: int
 
 cache_env = os.getenv("CACHE_DIR")
 if cache_env:
@@ -287,11 +290,16 @@ async def recommend(request: RecommendRequest):
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
 
 @app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
-async def search_anime(query: str = ""):
+async def search_anime(query: str = "", limit: int = 20, offset: int = 0):
     query = (query or "").strip()
 
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Limit must be between 1 and 100")
+    if offset < 0:
+        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Offset must be non-negative")
+
     if not query:
-        return SearchResponse(results=[])
+        return SearchResponse(results=[], total=0, limit=limit, offset=offset)
 
     if len(query) > 100:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Query too long (max 100 chars)")
@@ -308,6 +316,11 @@ async def search_anime(query: str = ""):
         matches = anime_df[mask]
         cols = [c for c in ["anime_id", "name", "title_english", "title_japanese"] if c in matches.columns]
         matches = matches[cols].drop_duplicates()
+        
+        total_count = len(matches)
+        
+        matches = matches.iloc[offset:offset + limit]
+        
         results = []
         for _, row in matches.iterrows():
             raw_id = row.get("anime_id")
@@ -331,7 +344,7 @@ async def search_anime(query: str = ""):
                 synopsis=metadata_info.get("synopsis")
             ))
 
-        return SearchResponse(results=results)
+        return SearchResponse(results=results, total=total_count, limit=limit, offset=offset)
 
     except Exception as e:
         logger.exception(f"Error searching anime with query: {query}")
