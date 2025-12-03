@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from rbm.constants import (
-    HTTP_BAD_REQUEST,
-    RATING_THRESHOLD,
-    DEFAULT_TOP_N,
-)
+HTTP_BAD_REQUEST = 400
+RATING_THRESHOLD = 7
+DEFAULT_TOP_N = 10
 
 HTTP_INTERNAL_ERROR = 500
 
