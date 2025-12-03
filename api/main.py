@@ -29,6 +29,8 @@ from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
 from api.inference.preprocess import filter_data
 from api.inference.recommender import get_recommendations
+from api.auth.router import router as auth_router
+from api.favorites.router import router as favorites_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -363,6 +365,8 @@ async def search_anime(request: Request, query: str = "", limit: int = 20, offse
         logger.exception(f"Error searching anime with query: {query}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while searching anime")
 
+v1_router.include_router(auth_router)
+v1_router.include_router(favorites_router)
 app.include_router(v1_router)
 
 if __name__ == "__main__":

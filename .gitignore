@@ -31,3 +31,6 @@ rbm/hyperparameter_tuning.py
 cache/
 .claude/
 
+*.md
+!README.md
+
