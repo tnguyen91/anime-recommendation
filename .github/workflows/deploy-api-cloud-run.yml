@@ -29,6 +29,8 @@ jobs:
             fi
           }
           check_required "${{ secrets.GCP_SA_KEY }}" "GCP_SA_KEY"
+          check_required "${{ secrets.DATABASE_URL }}" "DATABASE_URL"
+          check_required "${{ secrets.JWT_SECRET_KEY }}" "JWT_SECRET_KEY"
           check_required "${{ vars.GCP_PROJECT }}" "GCP_PROJECT"
           check_required "${{ vars.CLOUD_RUN_REGION }}" "CLOUD_RUN_REGION"
           check_required "${{ vars.CLOUD_RUN_SERVICE }}" "CLOUD_RUN_SERVICE"
@@ -81,4 +83,4 @@ jobs:
             --port 8000 \
             --timeout ${TIMEOUT:-10m} \
             --quiet \
-            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }},ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}
+            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }},ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
