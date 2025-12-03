@@ -1,4 +1,21 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: anime-db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432" 
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./api
@@ -11,7 +28,11 @@ services:
       - CACHE_DIR=/app/cache
       - ANIME_CSV_URI=${ANIME_CSV_URI}
       - USER_REVIEW_CSV_URI=${USER_REVIEW_CSV_URI}
-      - ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./api:/app/api:delegated
       - ./cache:/app/cache:delegated
@@ -43,3 +64,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  postgres_data:

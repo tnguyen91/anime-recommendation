@@ -7,10 +7,14 @@ from typing import Any
 import pandas as pd
 import torch
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from api.config import (
     DEFAULT_TOP_N,
@@ -25,6 +29,8 @@ from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
 from api.inference.preprocess import filter_data
 from api.inference.recommender import get_recommendations
+from api.auth.router import router as auth_router
+from api.favorites.router import router as favorites_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,6 +38,10 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
+
+v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
 
 class RecommendRequest(BaseModel):
     liked_anime: list[str]
@@ -50,6 +60,9 @@ class RecommendResponse(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[AnimeResult]
+    total: int
+    limit: int
+    offset: int
 
 cache_env = os.getenv("CACHE_DIR")
 if cache_env:
@@ -173,6 +186,9 @@ app = FastAPI(
     lifespan=lifespan 
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:8080,http://127.0.0.1:8080"
@@ -252,9 +268,10 @@ async def health():
 
     return health_status
 
-@app.post("/recommend", response_model=RecommendResponse, tags=["Recommendations"])
-async def recommend(request: RecommendRequest):
-    liked_anime = request.liked_anime
+@v1_router.post("/recommend", response_model=RecommendResponse, tags=["Recommendations"])
+@limiter.limit("30/minute")  # 30 requests per minute per IP
+async def recommend(request: Request, body: RecommendRequest):
+    liked_anime = body.liked_anime
 
     if not liked_anime:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="liked_anime must be a non-empty list")
@@ -286,12 +303,18 @@ async def recommend(request: RecommendRequest):
         logger.exception(f"Error generating recommendations for anime: {liked_anime}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
 
-@app.get("/search-anime", response_model=SearchResponse, tags=["Search"])
-async def search_anime(query: str = ""):
+@v1_router.get("/search-anime", response_model=SearchResponse, tags=["Search"])
+@limiter.limit("60/minute")  # 60 requests per minute per IP
+async def search_anime(request: Request, query: str = "", limit: int = 20, offset: int = 0):
     query = (query or "").strip()
 
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Limit must be between 1 and 100")
+    if offset < 0:
+        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Offset must be non-negative")
+
     if not query:
-        return SearchResponse(results=[])
+        return SearchResponse(results=[], total=0, limit=limit, offset=offset)
 
     if len(query) > 100:
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Query too long (max 100 chars)")
@@ -308,6 +331,11 @@ async def search_anime(query: str = ""):
         matches = anime_df[mask]
         cols = [c for c in ["anime_id", "name", "title_english", "title_japanese"] if c in matches.columns]
         matches = matches[cols].drop_duplicates()
+        
+        total_count = len(matches)
+        
+        matches = matches.iloc[offset:offset + limit]
+        
         results = []
         for _, row in matches.iterrows():
             raw_id = row.get("anime_id")
@@ -331,11 +359,15 @@ async def search_anime(query: str = ""):
                 synopsis=metadata_info.get("synopsis")
             ))
 
-        return SearchResponse(results=results)
+        return SearchResponse(results=results, total=total_count, limit=limit, offset=offset)
 
     except Exception as e:
         logger.exception(f"Error searching anime with query: {query}")
         raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while searching anime")
+
+v1_router.include_router(auth_router)
+v1_router.include_router(favorites_router)
+app.include_router(v1_router)
 
 if __name__ == "__main__":
     uvicorn.run(
