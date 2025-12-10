@@ -60,12 +60,29 @@ test_tensor = torch.FloatTensor(test_array)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using {device}")
 
+# Load already completed configs for resume training
+completed_configs = set()
+results_file = "out/tuning_results.csv"
+if os.path.exists(results_file):
+    with open(results_file, "r") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            key = (int(row["n_hidden"]), float(row["learning_rate"]), int(row["batch_size"]))
+            completed_configs.add(key)
+    print(f"Resuming: {len(completed_configs)} configs already completed, skipping them.")
+
 best_map = -1
 best_params = None
 
-for combo in itertools.product(param_grid["n_hidden"], param_grid["learning_rate"], param_grid["batch_size"]):
+all_combos = list(itertools.product(param_grid["n_hidden"], param_grid["learning_rate"], param_grid["batch_size"]))
+total_configs = len(all_combos)
+remaining_configs = [(i, c) for i, c in enumerate(all_combos) if c not in completed_configs]
+
+print(f"Total configs: {total_configs}, Remaining: {len(remaining_configs)}")
+
+for idx, combo in remaining_configs:
     n_hidden, learning_rate, batch_size = combo
-    print(f"\nTesting: n_hidden={n_hidden}, lr={learning_rate}, batch_size={batch_size}")
+    print(f"\n[{idx + 1}/{total_configs}] Testing: n_hidden={n_hidden}, lr={learning_rate}, batch_size={batch_size}")
     _random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
@@ -93,9 +110,9 @@ for combo in itertools.product(param_grid["n_hidden"], param_grid["learning_rate
     if final_map > best_map:
         best_map = final_map
         best_params = {"n_hidden": n_hidden, "learning_rate": learning_rate, "batch_size": batch_size}
-    write_header = not os.path.exists("out/tuning_results.csv")
+    write_header = not os.path.exists(results_file)
     os.makedirs("out", exist_ok=True)
-    with open("out/tuning_results.csv", "a", newline="") as f:
+    with open(results_file, "a", newline="") as f:
         writer = csv.writer(f)
         if write_header:
             writer.writerow(["n_hidden", "learning_rate", "batch_size", "precision_at_10", "ndcg_at_10", "map_at_10"])
