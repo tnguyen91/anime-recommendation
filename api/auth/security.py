@@ -1,4 +1,20 @@
-"""Security utilities for password hashing and JWT token management."""
+"""
+Security utilities for password hashing and JWT token management.
+
+Password Security:
+    - Passwords are hashed with bcrypt (one-way, salted, slow by design)
+    - Never store or log plain passwords
+
+JWT (JSON Web Tokens):
+    - Stateless authentication - no server-side sessions needed
+    - Token contains user ID and expiration time
+    - Signed with SECRET_KEY to prevent tampering
+    
+Environment Variables:
+    - JWT_SECRET_KEY: Required. Used to sign/verify tokens.
+    - JWT_ALGORITHM: Optional. Default is HS256.
+    - JWT_ACCESS_TOKEN_EXPIRE_MINUTES: Optional. Default is 30.
+"""
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -6,7 +22,10 @@ from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY environment variable must be set")
+
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 

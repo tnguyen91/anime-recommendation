@@ -1,45 +1,35 @@
-"""Favorites API endpoints."""
+"""
+Favorites API endpoints.
+
+Allows authenticated users to manage their favorite anime list.
+All endpoints require JWT authentication.
+
+Endpoints:
+    GET    /favorites              - List user's favorites
+    POST   /favorites              - Add anime to favorites
+    DELETE /favorites/{id}         - Remove by favorite ID
+    DELETE /favorites/anime/{id}   - Remove by anime ID  
+    GET    /favorites/check/{id}   - Check if anime is favorited
+"""
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from api.database import get_db
-from api.models import User, UserFavorite
+from api.anime_cache import get_anime_info
 from api.auth.dependencies import get_current_user
+from api.database import get_db
 from api.favorites.schemas import (
+    FavoriteCheckResponse,
     FavoriteCreate,
-    FavoriteResponse,
     FavoriteListResponse,
+    FavoriteResponse,
     MessageResponse,
 )
+from api.models import User, UserFavorite
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
-
-
-def get_anime_info(anime_id: int) -> dict:
-    """Get anime info from loaded metadata."""
-    try:
-        from api.main import anime_metadata, anime_df
-        
-        info = {}
-        metadata = anime_metadata.get(str(anime_id)) or anime_metadata.get(anime_id, {})
-        if metadata:
-            info["name"] = metadata.get("title") or metadata.get("name")
-            info["title_english"] = metadata.get("title_english")
-            info["image_url"] = metadata.get("image_url")
-        
-        if not info.get("name") and anime_df is not None:
-            match = anime_df[anime_df["anime_id"] == anime_id]
-            if not match.empty:
-                row = match.iloc[0]
-                info["name"] = row.get("name")
-                info["title_english"] = row.get("title_english")
-        
-        return info
-    except Exception:
-        return {}
 
 
 @router.get("", response_model=FavoriteListResponse)
@@ -126,16 +116,12 @@ async def remove_favorite(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Remove an anime from the user's favorites by favorite ID.
-    
-    Requires authentication.
-    """
+    """Remove a favorite by its ID."""
     favorite = (
         db.query(UserFavorite)
         .filter(
             UserFavorite.id == favorite_id,
-            UserFavorite.user_id == current_user.id  # Ensure user owns this favorite
+            UserFavorite.user_id == current_user.id
         )
         .first()
     )
@@ -161,13 +147,7 @@ async def remove_favorite_by_anime(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Remove an anime from the user's favorites by anime ID.
-    
-    This is useful when you know the anime_id but not the favorite record ID.
-    
-    Requires authentication.
-    """
+    """Remove a favorite by anime ID (alternative to using favorite ID)."""
     favorite = (
         db.query(UserFavorite)
         .filter(
@@ -191,19 +171,13 @@ async def remove_favorite_by_anime(
     return MessageResponse(message="Favorite removed successfully")
 
 
-@router.get("/check/{anime_id}")
+@router.get("/check/{anime_id}", response_model=FavoriteCheckResponse)
 async def check_favorite(
     anime_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Check if an anime is in the user's favorites.
-    
-    Returns {"is_favorite": true/false}
-    
-    Requires authentication.
-    """
+    """Check if an anime is in the user's favorites."""
     exists = (
         db.query(UserFavorite)
         .filter(
@@ -212,5 +186,5 @@ async def check_favorite(
         )
         .first()
     ) is not None
-    
-    return {"is_favorite": exists, "anime_id": anime_id}
+
+    return FavoriteCheckResponse(is_favorite=exists, anime_id=anime_id)

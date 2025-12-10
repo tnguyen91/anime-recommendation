@@ -1,64 +1,73 @@
+"""
+SQLAlchemy database models.
+
+These classes define the structure of database tables. SQLAlchemy uses these
+to generate SQL and map database rows to Python objects.
+
+Tables:
+    - users: User accounts with authentication info
+    - user_favorites: Anime saved by users
+    - recommendation_history: (Future) Track recommendation engagement
+"""
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from api.database import Base
 
 
 class User(Base):
-    __tablename__ = "users"  
-    
+    """User account model."""
+    __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    
     email = Column(String(255), unique=True, index=True, nullable=False)
-    
     username = Column(String(100), unique=True, index=True, nullable=True)
-    
     hashed_password = Column(String(255), nullable=False)
-    
     is_active = Column(Boolean, default=True, nullable=False)
-    
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    
+
     favorites = relationship("UserFavorite", back_populates="user", cascade="all, delete-orphan")
     recommendations = relationship("RecommendationHistory", back_populates="user", cascade="all, delete-orphan")
-    
+
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
 
 
 class UserFavorite(Base):
+    """User's favorite anime."""
     __tablename__ = "user_favorites"
-    
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
-    anime_id = Column(Integer, nullable=False, index=True)
+    __table_args__ = (
+        UniqueConstraint('user_id', 'anime_id', name='uix_user_anime'),
+    )
 
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    anime_id = Column(Integer, nullable=False, index=True)
     added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User", back_populates="favorites")
-    
+
     def __repr__(self):
         return f"<UserFavorite(user_id={self.user_id}, anime_id={self.anime_id})>"
 
 
 class RecommendationHistory(Base):
+    """
+    Track recommendation engagement (future feature).
+    
+    TODO: Implement endpoints to record when users click on or favorite
+    recommended anime. Useful for improving the recommendation algorithm.
+    """
     __tablename__ = "recommendation_history"
-    
+
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
     anime_id = Column(Integer, nullable=False, index=True)
-
     recommended_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-
     clicked = Column(Boolean, default=False, nullable=False)
-    
     favorited = Column(Boolean, default=False, nullable=False)
-    
+
     user = relationship("User", back_populates="recommendations")
-    
+
     def __repr__(self):
         return f"<RecommendationHistory(user_id={self.user_id}, anime_id={self.anime_id})>"
