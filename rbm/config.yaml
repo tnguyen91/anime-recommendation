@@ -7,9 +7,9 @@ model:
   k: 10
 
 data:
-  holdout_ratio: 0.1  # 10% of liked items held out for testing
-  min_likes_user: 100 # Users must have at least 100 liked anime
-  min_likes_anime: 50 # Anime must have at least 50 likes
+  holdout_ratio: 0.1    # 10% of liked items held out for testing
+  min_likes_user: 50    # Users must have at least 50 liked anime (was 100)
+  min_likes_anime: 50   # Anime must have at least 50 likes
 
 paths:
   model_path: "out/rbm_best_model.pth"
