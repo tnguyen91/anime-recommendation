@@ -44,4 +44,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 EXPOSE 8000
 ENV PORT=8000
 ENTRYPOINT ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${UVICORN_WORKERS:-1} --timeout-keep-alive 60"]
-# Force rebuild Wed Dec 10 20:13:35 PST 2025
