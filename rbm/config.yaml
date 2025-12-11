@@ -1,14 +1,15 @@
 # RBM Model Configuration
+# Best config from hyperparameter tuning (18 configs tested)
 model:
   n_hidden: 1024
   learning_rate: 0.001
-  batch_size: 32
-  epochs: 30
+  batch_size: 64        # Updated from 32 (best from tuning)
+  epochs: 50            # Increased for final training
   k: 10
 
 data:
   holdout_ratio: 0.1    # 10% of liked items held out for testing
-  min_likes_user: 50    # Users must have at least 50 liked anime (was 100)
+  min_likes_user: 50    # Users must have at least 50 liked anime
   min_likes_anime: 50   # Anime must have at least 50 likes
 
 paths:
