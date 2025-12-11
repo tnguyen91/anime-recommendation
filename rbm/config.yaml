@@ -1,10 +1,9 @@
 # RBM Model Configuration
-# Best config from hyperparameter tuning (18 configs tested)
 model:
   n_hidden: 1024
   learning_rate: 0.001
-  batch_size: 64        # Updated from 32 (best from tuning)
-  epochs: 50            # Increased for final training
+  batch_size: 64
+  epochs: 50
   k: 10
 
 data:

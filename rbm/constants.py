@@ -37,7 +37,7 @@ DEFAULT_TOP_N = 10
 
 HYPERPARAMETER_GRID: Dict[str, List] = {
     "n_hidden": [256, 512, 1024],
-    "learning_rate": [0.005, 0.001],  # Removed 0.0001 (too slow) and 0.01 (less stable)
+    "learning_rate": [0.005, 0.001],
     "batch_size": [16, 32, 64],
 }
-HYPERPARAMETER_EPOCHS = 50  # Increased from 30 for better convergence
+HYPERPARAMETER_EPOCHS = 50
