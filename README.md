@@ -1,12 +1,34 @@
 # Anime Recommendation System
 
-Collaborative filtering recommendation system using Restricted Boltzmann Machines (RBM). Includes FastAPI backend, web UI, and Google Cloud Run deployment.
+A personalized anime recommendation engine using Restricted Boltzmann Machines (RBM). Built with FastAPI, deployed on Google Cloud Run.
+
+**Live Demo:** [animereco-ui-725392014501.us-west1.run.app](https://animereco-ui-725392014501.us-west1.run.app)
+
+## Features
+
+- ML-powered recommendations using RBM neural network
+- Search across 12,000+ anime
+- User authentication with JWT
+- Rate-limited API endpoints
+- Google Analytics integration
+
+## Model Performance
+
+| Metric | Value |
+|--------|-------|
+| MAP@10 | 0.4169 |
+| Precision@10 | 0.1787 |
+| NDCG@10 | 0.2531 |
+
+Trained on 5,859 users × 12,347 anime (~1.3M interactions)
 
 ## Tech Stack
 
-- Python 3.12, PyTorch 2.2.2, FastAPI 0.116.2
-- Docker, Google Cloud Run, GitHub Actions
-- Vanilla JS frontend
+- **Backend:** Python 3.12, FastAPI, PyTorch, SQLAlchemy
+- **Frontend:** Vanilla JS, CSS
+- **Database:** PostgreSQL (Neon)
+- **Deployment:** Docker, Google Cloud Run, GitHub Actions
+- **Auth:** JWT + bcrypt
 
 ## Quickstart
 
@@ -22,148 +44,80 @@ docker-compose up --build
 
 ```
 anime-recommendation/
-├── .github/
-│   └── workflows/
-│       ├── deploy-api-cloud-run.yml
-│       └── deploy-ui-cloud-run.yml
-├── api/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── main.py
-│   ├── config.py
-│   ├── inference/
-│   │   ├── model.py
-│   │   ├── recommender.py
-│   │   ├── data_loader.py
-│   │   ├── preprocess.py
-│   │   └── downloads.py
+├── api/                    # FastAPI backend
+│   ├── auth/               # Authentication (JWT)
+│   ├── favorites/          # User favorites CRUD
+│   ├── inference/          # RBM model & recommendations
+│   ├── alembic/            # Database migrations
 │   └── tests/
-│       └── test_api.py
-├── rbm/
-│   ├── main.py
-│   ├── config.yaml
-│   ├── constants.py
-│   ├── hyperparameter_tuning.py
-│   ├── build_metadata_cache.py
-│   └── src/
-│       ├── model.py
-│       ├── train.py
-│       ├── evaluate.py
-│       ├── data_loader.py
-│       └── utils.py
-├── anime-recommendation-ui/
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── index.html
-│   ├── app.js
-│   ├── config.js
-│   └── styles.css
-├── data/
-├── out/
-├── docker-compose.yml
-├── .env
-└── README.md
+├── rbm/                    # Model training
+│   ├── src/                # Training code
+│   ├── config.yaml         # Hyperparameters
+│   └── hyperparameter_tuning.py
+├── anime-recommendation-ui/ # Frontend
+└── .github/workflows/      # CI/CD
 ```
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/recommend` | POST | Get recommendations |
-| `/search-anime` | GET | Search anime |
+| `/api/v1/recommend` | POST | Get recommendations |
+| `/api/v1/search-anime` | GET | Search anime |
+| `/api/v1/auth/register` | POST | Create account |
+| `/api/v1/auth/login` | POST | Login |
+| `/api/v1/favorites` | GET/POST/DELETE | Manage favorites |
 
-**Request Example:**
+**Example:**
 ```bash
-curl -X POST http://localhost:8000/recommend \
+curl -X POST https://animereco-api-725392014501.us-west1.run.app/api/v1/recommend \
   -H "Content-Type: application/json" \
   -d '{"liked_anime": ["Steins;Gate", "Death Note"]}'
 ```
 
-**Response:**
-```json
-{
-  "recommendations": [
-    {
-      "anime_id": 9253,
-      "name": "Steins;Gate",
-      "title_english": "Steins;Gate",
-      "title_japanese": "シュタインズ・ゲート",
-      "image_url": "https://cdn.myanimelist.net/images/anime/5/73199.jpg",
-      "genre": ["Sci-Fi", "Thriller"],
-      "synopsis": "..."
-    }
-  ]
-}
-```
+## Development
 
-## Development Setup
-
-### Run API
+### Local Setup
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-cd api && pip install -r requirements.txt
-cd .. && python -m api.main
-```
-
-### Run Frontend
-```bash
-cd anime-recommendation-ui
-python -m http.server 8080
+pip install -r api/requirements.txt
+uvicorn api.main:app --reload
 ```
 
 ### Environment Variables
-
-Required in `.env`:
 ```env
-MODEL_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/rbm_best_model.pth
+DATABASE_URL=postgresql://...
+JWT_SECRET_KEY=your-secret-key
+MODEL_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v2.0/rbm_best_model.pth
 METADATA_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/anime_metadata.json
 ANIME_CSV_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/Anime.csv
 USER_REVIEW_CSV_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/User-AnimeReview.csv
-CACHE_DIR=/app/cache
-ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
 ```
 
 ## Model Training
 
-### Train Model
+### Train with Best Config
 ```bash
-python rbm/main.py --train
+python -m rbm.main --train --no-cli
 ```
-
-Output: `rbm/out/rbm_best_model.pth`
 
 ### Hyperparameter Tuning
 ```bash
-python rbm/hyperparameter_tuning.py
+python -m rbm.hyperparameter_tuning
 ```
 
-Output: `rbm/out/tuning_results.csv`
+Supports resume - if interrupted, re-run and it will skip completed configs.
 
-### Configuration
-
-**API** ([api/config.py](api/config.py)):
-```python
-RATING_THRESHOLD = 7
-DEFAULT_TOP_N = 10
-MIN_LIKES_USER = 100
-MIN_LIKES_ANIME = 50
-N_HIDDEN = 256
-```
-
-**Training** ([rbm/config.yaml](rbm/config.yaml)):
+### Current Best Configuration
 ```yaml
 model:
-  n_hidden: 256
+  n_hidden: 1024
   learning_rate: 0.001
-  batch_size: 16
-  epochs: 30
-  k: 10  # Top-K for evaluation metrics
-
+  batch_size: 64
+  epochs: 50
 data:
-  holdout_ratio: 0.1
-  min_likes_user: 100
+  min_likes_user: 50
   min_likes_anime: 50
 ```
 
@@ -171,69 +125,40 @@ data:
 
 Source: [MyAnimeList Dataset](https://www.kaggle.com/datasets/bsurya27/myanimelists-anime-and-user-anime-interactions)
 
+| Metric | Raw | Processed |
+|--------|-----|-----------|
+| Users | 1.2M | 5,859 |
+| Anime | 28,467 | 12,347 |
+| Ratings | 16.6M | 1.34M |
+
 Preprocessing:
-- Binary implicit feedback (rating ≥ 7 = liked)
-- User threshold: ≥100 liked anime
-- Anime threshold: ≥50 likes
-- Hentai/adult content filtered
-
-Processed Dataset:
-- User-anime matrix: 1,922 users × 12,347 anime
-- Filtered interactions: 855,449 ratings (from 15.3M raw)
-
-## Model
-
-**RBM Architecture:**
-- Input: Binary user-anime interaction vectors
-- Hidden units: 256 (latent factors)
-- Training: Contrastive Divergence (CD-1)
-- Optimizer: Adam (lr=0.001)
-
-**Evaluation Metrics:**
-- Precision@10: 0.1756
-- MAP@10: 0.3639
-- NDCG@10: 0.1967
-
-![Training Metrics](out/training_metrics.png)
+- Binary feedback (score ≥ 7 = liked)
+- Filter users with < 50 liked anime
+- Filter anime with < 50 likes
+- Remove adult content
 
 ## Testing
 
 ```bash
-cd api
-pytest tests/ -v
+pytest api/tests/ -v
 ```
 
-Coverage:
-- Health checks
-- Input validation
-- Recommendation generation
-- Metadata enrichment
+37 tests covering auth, recommendations, favorites, and validation.
 
 ## Deployment
 
-### Google Cloud Run
+Automated via GitHub Actions on push to `master`.
 
-Automated via GitHub Actions (`.github/workflows/deploy-api-cloud-run.yml`).
+**Required GitHub Secrets:**
+- `GCP_SA_KEY` - Service account JSON
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET_KEY` - JWT signing key
 
-**Required Secrets:**
-- `GCP_SA_KEY`
-
-**Required Variables:**
+**Required GitHub Variables:**
 - `GCP_PROJECT`, `CLOUD_RUN_REGION`, `CLOUD_RUN_SERVICE`
 - `MODEL_URI`, `METADATA_URI`, `ANIME_CSV_URI`, `USER_REVIEW_CSV_URI`
 - `ALLOWED_ORIGINS`
 
-### Manual Docker
-
-```bash
-cd api
-docker build -t anime-api .
-docker run -p 8000:8000 \
-  -e MODEL_URI=<url> \
-  -e METADATA_URI=<url> \
-  anime-api
-```
-
 ## License
 
-See [ATTRIBUTION.md](ATTRIBUTION.md) for dataset attribution.
+Dataset attribution: [ATTRIBUTION.md](ATTRIBUTION.md)
