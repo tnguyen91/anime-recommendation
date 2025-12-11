@@ -11,6 +11,7 @@ const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const state = {
   favorites: loadFavorites(),
+  recommendations: [],
   lastQuery: '',
   aborter: null,
   scrolling: false,
@@ -169,20 +170,60 @@ function renderRecommendations(items){
     els.grid.innerHTML = '<p class="muted">No recommendations yet. Add at least one favorite anime above, then click "Get Recommendations" to discover new shows you\'ll love!</p>';
     return;
   }
-  items.slice(0, 10).forEach(item => {
-    const card = createEl('article', {class:'card-lg', tabindex:'0', role:'button', 'aria-label': `${item.title}`});
+  state.recommendations = items.slice(0, 10);
+  state.recommendations.forEach((item, index) => {
+    const key = item.name || item.title;
+    const isFav = !!state.favorites[key];
+    const card = createEl('article', {class:'card-lg', tabindex:'0', 'aria-label': `${item.title}`});
     const img = createEl('img', {src: item.image || './assets/placeholder.svg', alt: `${item.title} cover`});
     const inner = createEl('div', {class:'p'});
     const title = createEl('h3', {}, item.title);
     const sub = createEl('div', {class:'sub'}, item.year ? String(item.year) : (item.genres && item.genres.length ? item.genres.slice(0,2).join(' • ') : ''));
+    
+    const actions = createEl('div', {class:'rec-actions'});
+    const favBtn = createEl('button', {
+      class: `rec-btn ${isFav ? 'rec-btn-fav' : 'rec-btn-add'}`,
+      'aria-label': isFav ? 'Already in favorites' : 'Add to favorites',
+      title: isFav ? 'Already in favorites' : 'Add to favorites'
+    }, isFav ? '♥' : '+');
+    const removeBtn = createEl('button', {
+      class: 'rec-btn rec-btn-remove',
+      'aria-label': 'Remove from recommendations',
+      title: 'Not interested'
+    }, '×');
+    
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!isFav) {
+        toggleFavorite(item);
+        favBtn.textContent = '♥';
+        favBtn.className = 'rec-btn rec-btn-fav';
+        favBtn.setAttribute('aria-label', 'Already in favorites');
+        favBtn.setAttribute('title', 'Already in favorites');
+      }
+    });
+    
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeRecommendation(index);
+    });
+    
+    actions.appendChild(favBtn);
+    actions.appendChild(removeBtn);
     inner.appendChild(title);
     inner.appendChild(sub);
     card.appendChild(img);
     card.appendChild(inner);
+    card.appendChild(actions);
     card.addEventListener('click', () => showDetails(item));
     card.addEventListener('keydown', (e) => { if(e.key==='Enter') showDetails(item); });
     els.grid.appendChild(card);
   });
+}
+
+function removeRecommendation(index){
+  state.recommendations.splice(index, 1);
+  renderRecommendations(state.recommendations);
 }
 
 function toggleFavorite(item){

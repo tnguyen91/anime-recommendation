@@ -169,6 +169,26 @@ button.primary:disabled{ opacity: 0.5; cursor:not-allowed }
 .card-lg h3{ font-size: 0.95rem; margin: 0 0 6px; line-height: 1.3; }
 .card-lg .sub{ color: var(--muted); font-size: 0.85rem; }
 
+.rec-actions{
+  display: flex; gap: 6px; padding: 0 10px 10px; justify-content: flex-end;
+}
+.rec-btn{
+  width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 1.1rem; font-weight: bold; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.rec-btn-add{
+  background: var(--accent); color: #fff;
+}
+.rec-btn-add:hover{ background: var(--accent-hover); transform: scale(1.1); }
+.rec-btn-fav{
+  background: #e91e63; color: #fff; cursor: default;
+}
+.rec-btn-remove{
+  background: var(--bg-dark); color: var(--muted); border: 1px solid var(--border);
+}
+.rec-btn-remove:hover{ background: #ef4444; color: #fff; border-color: #ef4444; transform: scale(1.1); }
+
 .modal{ position: fixed; inset:0; display:none; z-index: 100; align-items: center; justify-content: center; padding: 20px; }
 .modal[aria-hidden="false"]{ display:flex; }
 .modal-backdrop{ position:fixed; inset:0; background: rgba(0, 0, 0, 0.7); z-index: 99; backdrop-filter: blur(2px); }
