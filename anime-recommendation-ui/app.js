@@ -9,9 +9,13 @@ const logger = {
 
 const $ = (sel, root=document) => root.querySelector(sel);
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const DISPLAY_COUNT = 10;
+const FETCH_COUNT = 20;
+
 const state = {
   favorites: loadFavorites(),
   recommendations: [],
+  reserveRecommendations: [],
   lastQuery: '',
   aborter: null,
   scrolling: false,
@@ -180,27 +184,25 @@ function renderRecommendations(items){
     const title = createEl('h3', {}, item.title);
     const sub = createEl('div', {class:'sub'}, item.year ? String(item.year) : (item.genres && item.genres.length ? item.genres.slice(0,2).join(' • ') : ''));
     
-    const actions = createEl('div', {class:'rec-actions'});
     const favBtn = createEl('button', {
-      class: `rec-btn ${isFav ? 'rec-btn-fav' : 'rec-btn-add'}`,
-      'aria-label': isFav ? 'Already in favorites' : 'Add to favorites',
-      title: isFav ? 'Already in favorites' : 'Add to favorites'
-    }, isFav ? '♥' : '+');
+      class: `rec-btn rec-btn-fav-corner ${isFav ? 'is-fav' : ''}`,
+      'aria-label': isFav ? 'Remove from favorites' : 'Add to favorites',
+      title: isFav ? 'Remove from favorites' : 'Add to favorites'
+    }, '♥');
+    
     const removeBtn = createEl('button', {
-      class: 'rec-btn rec-btn-remove',
-      'aria-label': 'Remove from recommendations',
+      class: 'rec-btn rec-btn-remove-corner',
+      'aria-label': 'Not interested',
       title: 'Not interested'
     }, '×');
     
     favBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!isFav) {
-        toggleFavorite(item);
-        favBtn.textContent = '♥';
-        favBtn.className = 'rec-btn rec-btn-fav';
-        favBtn.setAttribute('aria-label', 'Already in favorites');
-        favBtn.setAttribute('title', 'Already in favorites');
-      }
+      toggleFavorite(item);
+      const nowFav = !!state.favorites[key];
+      favBtn.classList.toggle('is-fav', nowFav);
+      favBtn.setAttribute('aria-label', nowFav ? 'Remove from favorites' : 'Add to favorites');
+      favBtn.setAttribute('title', nowFav ? 'Remove from favorites' : 'Add to favorites');
     });
     
     removeBtn.addEventListener('click', (e) => {
@@ -208,13 +210,12 @@ function renderRecommendations(items){
       removeRecommendation(index);
     });
     
-    actions.appendChild(favBtn);
-    actions.appendChild(removeBtn);
     inner.appendChild(title);
     inner.appendChild(sub);
     card.appendChild(img);
+    card.appendChild(favBtn);
+    card.appendChild(removeBtn);
     card.appendChild(inner);
-    card.appendChild(actions);
     card.addEventListener('click', () => showDetails(item));
     card.addEventListener('keydown', (e) => { if(e.key==='Enter') showDetails(item); });
     els.grid.appendChild(card);
@@ -223,6 +224,9 @@ function renderRecommendations(items){
 
 function removeRecommendation(index){
   state.recommendations.splice(index, 1);
+  if (state.reserveRecommendations.length > 0 && state.recommendations.length < DISPLAY_COUNT) {
+    state.recommendations.push(state.reserveRecommendations.shift());
+  }
   renderRecommendations(state.recommendations);
 }
 
@@ -347,7 +351,7 @@ els.getRecsBtn.addEventListener('click', async () => {
     const res = await timeoutFetch(`${API_BASE_URL}/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept':'application/json' },
-      body: JSON.stringify({ liked_anime: likedAnime })
+      body: JSON.stringify({ liked_anime: likedAnime, top_n: FETCH_COUNT })
     });
     if (!res.ok) {
       const errorMsg = res.status === 500
@@ -368,7 +372,9 @@ els.getRecsBtn.addEventListener('click', async () => {
         genres: x.genre ?? [],
         synopsis: x.synopsis ?? null,
       }));
-    renderRecommendations(items);
+    // Split into display (first 10) and reserve (rest)
+    state.reserveRecommendations = items.slice(DISPLAY_COUNT);
+    renderRecommendations(items.slice(0, DISPLAY_COUNT));
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const targetEl = document.querySelector('#recommended');

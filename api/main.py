@@ -57,6 +57,7 @@ v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
 class RecommendRequest(BaseModel):
     """Request body for getting recommendations."""
     liked_anime: list[str]
+    top_n: int = DEFAULT_TOP_N
 
 
 class AnimeResult(BaseModel):
@@ -283,8 +284,9 @@ async def recommend(request: Request, body: RecommendRequest):
         raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="No matching anime found")
 
     try:
+        top_n = min(body.top_n, 50)
         input_vec = torch.FloatTensor([[1 if a in matched_ids else 0 for a in anime_ids]]).to(device)
-        recs = get_recommendations(input_vec.squeeze(0), rbm, anime_ids, anime_df, top_n=DEFAULT_TOP_N, device=device)
+        recs = get_recommendations(input_vec.squeeze(0), rbm, anime_ids, anime_df, top_n=top_n, device=device)
         
         recommendations = []
         for _, row in recs.iterrows():
