@@ -285,8 +285,10 @@ async def recommend(request: Request, body: RecommendRequest):
 
     try:
         top_n = min(body.top_n, 50)
+        logger.info(f"Generating {top_n} recommendations for {len(matched_ids)} matched anime")
         input_vec = torch.FloatTensor([[1 if a in matched_ids else 0 for a in anime_ids]]).to(device)
         recs = get_recommendations(input_vec.squeeze(0), rbm, anime_ids, anime_df, top_n=top_n, device=device)
+        logger.info(f"Got {len(recs)} recommendations")
         
         recommendations = []
         for _, row in recs.iterrows():
