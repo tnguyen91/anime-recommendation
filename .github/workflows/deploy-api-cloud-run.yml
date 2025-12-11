@@ -71,6 +71,9 @@ jobs:
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
       - name: Deploy to Cloud Run
+        env:
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           IMAGE="${{ steps.build-image.outputs.image }}"
 
@@ -83,4 +86,4 @@ jobs:
             --port 8000 \
             --timeout ${TIMEOUT:-10m} \
             --quiet \
-            --set-env-vars MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }},ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }},DATABASE_URL=${{ secrets.DATABASE_URL }},JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            --set-env-vars "MODEL_URI=${{ vars.MODEL_URI }},METADATA_URI=${{ vars.METADATA_URI }},ANIME_CSV_URI=${{ vars.ANIME_CSV_URI }},USER_REVIEW_CSV_URI=${{ vars.USER_REVIEW_CSV_URI }},ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }},DATABASE_URL=${DATABASE_URL},JWT_SECRET_KEY=${JWT_SECRET_KEY}"
