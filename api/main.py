@@ -58,6 +58,7 @@ class RecommendRequest(BaseModel):
     """Request body for getting recommendations."""
     liked_anime: list[str]
     top_n: int = DEFAULT_TOP_N
+    exclude_ids: list[int] = []
 
 
 class AnimeResult(BaseModel):
@@ -285,9 +286,10 @@ async def recommend(request: Request, body: RecommendRequest):
 
     try:
         top_n = min(body.top_n, 50)
-        logger.info(f"Generating {top_n} recommendations for {len(matched_ids)} matched anime")
+        exclude_ids = body.exclude_ids[:200]
+        logger.info(f"Generating {top_n} recommendations for {len(matched_ids)} matched anime (excluding {len(exclude_ids)} IDs)")
         input_vec = torch.FloatTensor([[1 if a in matched_ids else 0 for a in anime_ids]]).to(device)
-        recs = get_recommendations(input_vec.squeeze(0), rbm, anime_ids, anime_df, top_n=top_n, device=device)
+        recs = get_recommendations(input_vec.squeeze(0), rbm, anime_ids, anime_df, top_n=top_n, exclude_ids=exclude_ids, device=device)
         logger.info(f"Got {len(recs)} recommendations")
         
         recommendations = []

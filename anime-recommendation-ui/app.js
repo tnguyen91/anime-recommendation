@@ -15,7 +15,7 @@ const FETCH_COUNT = 20;
 const state = {
   favorites: loadFavorites(),
   recommendations: [],
-  reserveRecommendations: [],
+  shownIds: new Set(),  // Track all shown recommendation IDs
   lastQuery: '',
   aborter: null,
   scrolling: false,
@@ -222,12 +222,56 @@ function renderRecommendations(items){
   });
 }
 
-function removeRecommendation(index){
+async function removeRecommendation(index){
   state.recommendations.splice(index, 1);
-  if (state.reserveRecommendations.length > 0 && state.recommendations.length < DISPLAY_COUNT) {
-    state.recommendations.push(state.reserveRecommendations.shift());
+
+  if (state.recommendations.length < DISPLAY_COUNT) {
+    await fetchMoreRecommendations();
   }
+
   renderRecommendations(state.recommendations);
+}
+
+async function fetchMoreRecommendations(){
+  const likedAnime = Object.keys(state.favorites);
+  if (!likedAnime.length) return;
+
+  const needed = DISPLAY_COUNT - state.recommendations.length;
+  if (needed <= 0) return;
+
+  try {
+    const res = await timeoutFetch(`${API_BASE_URL}/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        liked_anime: likedAnime,
+        top_n: needed,
+        exclude_ids: [...state.shownIds]
+      })
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const newItems = (data.recommendations || []).map(x => ({
+      id: x.anime_id,
+      name: x.name,
+      title: x.name,
+      title_english: x.title_english ?? null,
+      title_japanese: x.title_japanese ?? null,
+      image: x.image_url ?? './assets/placeholder.svg',
+      year: x.year ?? null,
+      genres: x.genre ?? [],
+      synopsis: x.synopsis ?? null,
+    }));
+
+    // Add new items to shown set and recommendations
+    newItems.forEach(item => state.shownIds.add(item.id));
+    state.recommendations.push(...newItems);
+    renderRecommendations(state.recommendations);
+  } catch (err) {
+    logger.error('Error fetching more recommendations:', err);
+  }
 }
 
 function toggleFavorite(item){
@@ -347,11 +391,16 @@ els.getRecsBtn.addEventListener('click', async () => {
   const likedAnime = Object.keys(state.favorites);
   if (!likedAnime.length) return;
   setLoading(els.grid, true);
+
+  // Reset state for fresh recommendations
+  state.shownIds.clear();
+  state.recommendations = [];
+
   try{
     const res = await timeoutFetch(`${API_BASE_URL}/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept':'application/json' },
-      body: JSON.stringify({ liked_anime: likedAnime, top_n: FETCH_COUNT })
+      body: JSON.stringify({ liked_anime: likedAnime, top_n: DISPLAY_COUNT })
     });
     if (!res.ok) {
       const errorMsg = res.status === 500
@@ -372,9 +421,10 @@ els.getRecsBtn.addEventListener('click', async () => {
         genres: x.genre ?? [],
         synopsis: x.synopsis ?? null,
       }));
-    // Split into display (first 10) and reserve (rest)
-    state.reserveRecommendations = items.slice(DISPLAY_COUNT);
-    renderRecommendations(items.slice(0, DISPLAY_COUNT));
+
+    // Track shown IDs for future exclusion
+    items.forEach(item => state.shownIds.add(item.id));
+    renderRecommendations(items);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const targetEl = document.querySelector('#recommended');

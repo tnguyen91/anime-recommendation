@@ -12,6 +12,7 @@ def get_recommendations(
     anime_ids: list[int],
     anime_df: pd.DataFrame,
     top_n: int = DEFAULT_TOP_N,
+    exclude_ids: list[int] | None = None,
     device: str = 'cpu',
 ) -> pd.DataFrame:
     rbm.eval()
@@ -28,6 +29,13 @@ def get_recommendations(
 
     liked_indices = np.where(input_vector.cpu().numpy().flatten() == 1)[0]
     scores[liked_indices] = -1e6
+
+    # Exclude previously shown anime
+    if exclude_ids:
+        anime_id_to_idx = {aid: idx for idx, aid in enumerate(anime_ids)}
+        for exclude_id in exclude_ids:
+            if exclude_id in anime_id_to_idx:
+                scores[anime_id_to_idx[exclude_id]] = -1e6
 
     top_indices = scores.argsort()[::-1][:top_n]
     top_anime_ids = [anime_ids[i] for i in top_indices]
