@@ -1,8 +1,6 @@
 import os
 from typing import Dict, List
 
-HTTP_BAD_REQUEST = 400
-
 RATING_THRESHOLD = 7
 
 CLAMP_MIN = 0.0

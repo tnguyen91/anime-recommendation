@@ -30,6 +30,9 @@ services:
       - USER_REVIEW_CSV_URI=${USER_REVIEW_CSV_URI}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES}
     depends_on:
       db:
         condition: service_healthy
