@@ -1,5 +1,9 @@
 # Anime Recommendation System
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.116-009688.svg)](https://fastapi.tiangolo.com)
+
 A personalized anime recommendation engine using Restricted Boltzmann Machines (RBM). Built with FastAPI, deployed on Google Cloud Run.
 
 **Live Demo:** [animereco-ui-725392014501.us-west1.run.app](https://animereco-ui-725392014501.us-west1.run.app)

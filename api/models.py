@@ -53,10 +53,10 @@ class UserFavorite(Base):
 
 class RecommendationHistory(Base):
     """
-    Track recommendation engagement (future feature).
-    
-    TODO: Implement endpoints to record when users click on or favorite
-    recommended anime. Useful for improving the recommendation algorithm.
+    Track recommendation engagement for future model improvements.
+
+    Stores user interactions with recommendations to enable feedback-based
+    model refinement (e.g., click-through rate optimization).
     """
     __tablename__ = "recommendation_history"
 
