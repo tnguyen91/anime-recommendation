@@ -1,5 +1,28 @@
+/**
+ * Anime Recommendation Frontend Application
+ *
+ * Single-page application for browsing and getting anime recommendations.
+ * Communicates with the FastAPI backend to search anime, manage favorites,
+ * and get personalized recommendations powered by a Restricted Boltzmann Machine.
+ *
+ * Features:
+ * - Debounced anime search with autocomplete suggestions
+ * - Local storage persistence for favorites (works without authentication)
+ * - Personalized recommendations based on liked anime
+ * - Infinite scroll with exclusion of previously shown recommendations
+ * - Accessible modal dialogs with focus trapping
+ * - Keyboard shortcuts (Ctrl+K to search, Ctrl+Enter to get recommendations)
+ */
+
+// =============================================================================
+// Configuration
+// =============================================================================
+
 const API_BASE_URL = window.APP_CONFIG?.API_BASE_URL || 'http://localhost:8000';
 const IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const DISPLAY_COUNT = 10;
+
+/** Development-only logger that silences logs in production */
 const logger = {
   error: (...args) => console.error(...args),
   warn: (...args) => IS_DEV && console.warn(...args),
@@ -7,20 +30,63 @@ const logger = {
   log: (...args) => IS_DEV && console.log(...args)
 };
 
+// =============================================================================
+// Utility Functions
+// =============================================================================
+
+/** Query selector shorthand */
 const $ = (sel, root=document) => root.querySelector(sel);
+/** Query selector all shorthand (returns array) */
 const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-const DISPLAY_COUNT = 10;
-const FETCH_COUNT = 20;
+
+/**
+ * Maps API response to normalized anime item format.
+ * @param {Object} x - Raw API response item
+ * @returns {Object} Normalized anime item
+ */
+function mapAnimeResult(x) {
+  return {
+    id: x.anime_id,
+    name: x.name,
+    title: x.name,
+    title_english: x.title_english ?? null,
+    title_japanese: x.title_japanese ?? null,
+    image: x.image_url ?? './assets/placeholder.svg',
+    year: x.year ?? null,
+    genres: x.genre ?? [],
+    synopsis: x.synopsis ?? null,
+  };
+}
+
+/**
+ * Smoothly scrolls to a target element, accounting for fixed header.
+ * @param {string} targetId - ID of the target element (without #)
+ * @param {number} extraOffset - Additional offset in pixels (default: 0)
+ */
+function scrollToSection(targetId, extraOffset = 0) {
+  const targetEl = document.getElementById(targetId);
+  if (targetEl) {
+    const header = document.querySelector('.site-header');
+    const headerHeight = header ? header.offsetHeight : 0;
+    const targetPosition = targetEl.getBoundingClientRect().top + window.scrollY - headerHeight - extraOffset;
+    window.scrollTo({ top: targetPosition, behavior: 'smooth' });
+  }
+}
+
+// =============================================================================
+// Application State
+// =============================================================================
 
 const state = {
   favorites: loadFavorites(),
   recommendations: [],
-  shownIds: new Set(),  // Track all shown recommendation IDs
+  shownIds: new Set(),  // Track shown IDs to exclude from future requests
   lastQuery: '',
   aborter: null,
   scrolling: false,
 };
 
+/** Cached DOM element references for performance */
 const els = {
   suggestions: $("#suggestions"),
   searchInput: $("#search-input"),
@@ -32,6 +98,11 @@ const els = {
   modalContent: $("#modal-content"),
 };
 
+// =============================================================================
+// Local Storage (Favorites Persistence)
+// =============================================================================
+
+/** Load favorites from localStorage with fallback to empty object */
 function loadFavorites(){
   try {
     const raw = localStorage.getItem("favorites");
@@ -41,11 +112,21 @@ function loadFavorites(){
   } catch(_){ return {}; }
 }
 
+/** Persist current favorites to localStorage */
 function persistFavorites(){
   localStorage.setItem("favorites", JSON.stringify(state.favorites));
   updateCTA();
 }
 
+// =============================================================================
+// Network & Performance Utilities
+// =============================================================================
+
+/**
+ * Creates a debounced version of a function.
+ * @param {Function} fn - Function to debounce
+ * @param {number} ms - Delay in milliseconds
+ */
 function debounce(fn, ms){
   let t;
   return (...args) => {
@@ -54,6 +135,12 @@ function debounce(fn, ms){
   }
 }
 
+/**
+ * Fetch wrapper with automatic timeout.
+ * @param {string} resource - URL to fetch
+ * @param {Object} options - Fetch options
+ * @param {number} ms - Timeout in milliseconds (default: 15000)
+ */
 function timeoutFetch(resource, options={}, ms=15000){
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
@@ -65,6 +152,11 @@ function timeoutFetch(resource, options={}, ms=15000){
   });
 }
 
+// =============================================================================
+// UI Helpers
+// =============================================================================
+
+/** Set loading state on an element with ARIA attributes */
 function setLoading(el, isLoading){
   if(isLoading){
     el.setAttribute('data-loading', 'true');
@@ -75,6 +167,10 @@ function setLoading(el, isLoading){
   }
 }
 
+/**
+ * Create DOM element with attributes and children.
+ * Supports class, dataset, event handlers (onX), and standard attributes.
+ */
 function createEl(tag, attrs={}, children=[]){
   const el = document.createElement(tag);
   for (const [k,v] of Object.entries(attrs)){
@@ -90,10 +186,15 @@ function createEl(tag, attrs={}, children=[]){
   return el;
 }
 
+// =============================================================================
+// Modal & Accessibility
+// =============================================================================
+
 let focusableElements = [];
 let firstFocusable = null;
 let lastFocusable = null;
 
+/** Trap focus within modal for accessibility (keyboard navigation) */
 function trapFocus(e) {
   if (e.key !== 'Tab') return;
   if (e.shiftKey) {
@@ -109,6 +210,7 @@ function trapFocus(e) {
   }
 }
 
+/** Update focus trap boundaries when modal content changes */
 function updateFocusTrap() {
   const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
   focusableElements = Array.from(els.modal.querySelectorAll(focusableSelectors))
@@ -117,6 +219,11 @@ function updateFocusTrap() {
   lastFocusable = focusableElements[focusableElements.length - 1];
 }
 
+// =============================================================================
+// Rendering Functions
+// =============================================================================
+
+/** Render the favorites list in the sidebar */
 function renderFavorites(){
   els.favoritesList.innerHTML = '';
   const entries = Object.values(state.favorites);
@@ -132,11 +239,13 @@ function renderFavorites(){
   }
 }
 
+/** Enable/disable the Get Recommendations button based on favorites count */
 function updateCTA(){
   const hasFavs = Object.keys(state.favorites).length > 0;
   els.getRecsBtn.disabled = !hasFavs;
 }
 
+/** Render search suggestion cards */
 function renderSuggestions(items){
   els.suggestions.innerHTML = '';
   if (!items || !items.length) return;
@@ -168,6 +277,7 @@ function renderSuggestions(items){
   }
 }
 
+/** Render recommendation cards in the main grid */
 function renderRecommendations(items){
   els.grid.innerHTML = '';
   if (!items || !items.length){
@@ -222,6 +332,11 @@ function renderRecommendations(items){
   });
 }
 
+// =============================================================================
+// Recommendation Logic
+// =============================================================================
+
+/** Remove a recommendation and fetch more if needed to maintain display count */
 async function removeRecommendation(index){
   state.recommendations.splice(index, 1);
 
@@ -232,6 +347,7 @@ async function removeRecommendation(index){
   renderRecommendations(state.recommendations);
 }
 
+/** Fetch additional recommendations, excluding previously shown anime */
 async function fetchMoreRecommendations(){
   const likedAnime = Object.keys(state.favorites);
   if (!likedAnime.length) return;
@@ -253,17 +369,7 @@ async function fetchMoreRecommendations(){
     if (!res.ok) return;
 
     const data = await res.json();
-    const newItems = (data.recommendations || []).map(x => ({
-      id: x.anime_id,
-      name: x.name,
-      title: x.name,
-      title_english: x.title_english ?? null,
-      title_japanese: x.title_japanese ?? null,
-      image: x.image_url ?? './assets/placeholder.svg',
-      year: x.year ?? null,
-      genres: x.genre ?? [],
-      synopsis: x.synopsis ?? null,
-    }));
+    const newItems = (data.recommendations || []).map(mapAnimeResult);
 
     // Add new items to shown set and recommendations
     newItems.forEach(item => state.shownIds.add(item.id));
@@ -274,6 +380,11 @@ async function fetchMoreRecommendations(){
   }
 }
 
+// =============================================================================
+// User Actions
+// =============================================================================
+
+/** Toggle an anime's favorite status */
 function toggleFavorite(item){
   const key = item.name || item.title;
   if (state.favorites[key]){
@@ -285,6 +396,7 @@ function toggleFavorite(item){
   persistFavorites();
 }
 
+/** Show anime details in modal dialog */
 async function showDetails(item){
   try {
     setLoading(document.body, true);
@@ -300,6 +412,7 @@ async function showDetails(item){
   }
 }
 
+/** Build modal content for anime details */
 function renderDetailContent(data){
   const body = createEl('div', {class:'modal-body'});
   const img = createEl('img', {src: data.image || './assets/placeholder.svg', alt: `${data.title || 'Anime'} cover`});
@@ -315,6 +428,7 @@ function renderDetailContent(data){
   return body;
 }
 
+/** Open modal with given content and set up focus trapping */
 function openModal(content){
   els.modalContent.innerHTML = '';
   els.modalContent.appendChild(content);
@@ -327,16 +441,23 @@ function openModal(content){
   });
 }
 
+/** Close modal and clean up event listeners */
 function closeModal(){
   els.modal.setAttribute('aria-hidden', 'true');
   els.modal.removeEventListener('keydown', trapFocus);
 }
 
+// =============================================================================
+// Event Listeners & Initialization
+// =============================================================================
+
+// Modal close handlers
 $$('[data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && els.modal.getAttribute('aria-hidden') === 'false') closeModal();
 });
 
+/** Debounced search handler - triggers after 300ms of no input */
 const doSearch = debounce(async (q) => {
   if (!q || q.trim().length < 2){
     renderSuggestions([]);
@@ -354,18 +475,7 @@ const doSearch = debounce(async (q) => {
       throw new Error(`Search failed (${res.status})`);
     }
     const data = await res.json();
-    const items = (data.results || [])
-      .map(x => ({
-        id: x.anime_id,
-        name: x.name,
-        title: x.name,
-        title_english: x.title_english ?? null,
-        title_japanese: x.title_japanese ?? null,
-        image: x.image_url ?? './assets/placeholder.svg',
-        year: x.year ?? null,
-        genres: x.genre ?? [],
-        synopsis: x.synopsis ?? null,
-      }));
+    const items = (data.results || []).map(mapAnimeResult);
     renderSuggestions(items);
   } catch (err){
     logger.error('Search error:', err);
@@ -378,6 +488,7 @@ const doSearch = debounce(async (q) => {
   }
 }, 300);
 
+// Search input handlers
 els.searchInput.addEventListener('input', (e) => {
   doSearch(e.target.value);
 });
@@ -387,6 +498,7 @@ els.clearSearch.addEventListener('click', () => {
   els.searchInput.focus();
 });
 
+// Get Recommendations button handler
 els.getRecsBtn.addEventListener('click', async () => {
   const likedAnime = Object.keys(state.favorites);
   if (!likedAnime.length) return;
@@ -409,33 +521,12 @@ els.getRecsBtn.addEventListener('click', async () => {
       throw new Error(errorMsg);
     }
     const data = await res.json();
-    const items = (data.recommendations || [])
-      .map(x => ({
-        id: x.anime_id,
-        name: x.name,
-        title: x.name,
-        title_english: x.title_english ?? null,
-        title_japanese: x.title_japanese ?? null,
-        image: x.image_url ?? './assets/placeholder.svg',
-        year: x.year ?? null,
-        genres: x.genre ?? [],
-        synopsis: x.synopsis ?? null,
-      }));
+    const items = (data.recommendations || []).map(mapAnimeResult);
 
     // Track shown IDs for future exclusion
     items.forEach(item => state.shownIds.add(item.id));
     renderRecommendations(items);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const targetEl = document.querySelector('#recommended');
-        if (targetEl) {
-          const header = document.querySelector('.site-header');
-          const headerHeight = header ? header.offsetHeight : 0;
-          const targetPosition = targetEl.getBoundingClientRect().top + window.scrollY - headerHeight;
-          window.scrollTo({ top: targetPosition, behavior: 'smooth' });
-        }
-      });
-    });
+    requestAnimationFrame(() => scrollToSection('recommended'));
   } catch(err){
     logger.error('Recommendation error:', err);
     const errorMsg = err.name === 'AbortError'
@@ -447,9 +538,11 @@ els.getRecsBtn.addEventListener('click', async () => {
   }
 });
 
+// Initialize UI on page load
 renderFavorites();
 updateCTA();
 
+// Lazy loading for images (performance optimization)
 if ('IntersectionObserver' in window) {
   const imageObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -466,25 +559,23 @@ if ('IntersectionObserver' in window) {
   window.lazyLoadImage = (img) => imageObserver.observe(img);
 }
 
+// Smooth scroll for navigation links
 $$('.nav-link').forEach(link => {
   link.addEventListener('click', (e) => {
     e.preventDefault();
     const targetId = link.getAttribute('href').substring(1);
-    const targetEl = document.getElementById(targetId);
-    if (targetEl) {
-      const header = document.querySelector('.site-header');
-      const headerHeight = header ? header.offsetHeight : 0;
-      const targetPosition = targetEl.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
-      window.scrollTo({ top: targetPosition, behavior: 'smooth' });
-    }
+    scrollToSection(targetId, 12);
   });
 });
 
+// Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
+  // Ctrl+K: Focus search input
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
     els.searchInput?.focus();
   }
+  // Ctrl+Enter: Get recommendations
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     if (!els.getRecsBtn.disabled) {
       e.preventDefault();
@@ -493,12 +584,15 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Network status monitoring
 window.addEventListener('online', () => {
   logger.info('Connection restored');
 });
 window.addEventListener('offline', () => {
   logger.warn('No internet connection');
 });
+
+// Global error handling
 window.addEventListener('error', (e) => {
   logger.error('Uncaught error:', e.error);
 });
