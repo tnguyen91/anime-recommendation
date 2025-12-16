@@ -102,8 +102,17 @@ anime_ids = None
 rbm = None
 
 
+def _safe_str(value) -> str:
+    """Return empty string for null/NaN values, otherwise str(value)."""
+    return "" if pd.isnull(value) else str(value)
+
+
+def _get_metadata(anime_id: int) -> dict:
+    """Lookup metadata by anime_id, trying both str and int keys."""
+    return anime_metadata.get(str(anime_id)) or anime_metadata.get(anime_id, {})
+
+
 def _load_model(model_path: Path, expected_n_visible: int):
-    """Load RBM model from checkpoint file."""
     ckpt = torch.load(model_path, map_location=device)
     
     # Handle different checkpoint formats
@@ -294,12 +303,13 @@ async def recommend(request: Request, body: RecommendRequest):
         
         recommendations = []
         for _, row in recs.iterrows():
-            info = anime_metadata.get(str(row["anime_id"])) or anime_metadata.get(int(row["anime_id"])) or {}
+            aid = int(row["anime_id"])
+            info = _get_metadata(aid)
             recommendations.append(AnimeResult(
-                anime_id=int(row["anime_id"]),
+                anime_id=aid,
                 name=row["name"],
-                title_english="" if pd.isnull(row.get("title_english")) else row.get("title_english", ""),
-                title_japanese="" if pd.isnull(row.get("title_japanese")) else row.get("title_japanese", ""),
+                title_english=_safe_str(row.get("title_english")),
+                title_japanese=_safe_str(row.get("title_japanese")),
                 image_url=info.get("image_url"),
                 genre=info.get("genres", []),
                 synopsis=info.get("synopsis")
@@ -367,15 +377,15 @@ async def search_anime(request: Request, query: str = "", limit: int = 20, offse
             except (TypeError, ValueError):
                 continue
 
-            metadata = anime_metadata.get(str(anime_id)) or anime_metadata.get(anime_id, {})
+            info = _get_metadata(anime_id)
             results.append(AnimeResult(
                 anime_id=anime_id,
-                name="" if pd.isnull(row.get("name")) else row.get("name", ""),
-                title_english="" if pd.isnull(row.get("title_english")) else row.get("title_english", ""),
-                title_japanese="" if pd.isnull(row.get("title_japanese")) else row.get("title_japanese", ""),
-                image_url=metadata.get("image_url"),
-                genre=metadata.get("genres", []),
-                synopsis=metadata.get("synopsis")
+                name=_safe_str(row.get("name")),
+                title_english=_safe_str(row.get("title_english")),
+                title_japanese=_safe_str(row.get("title_japanese")),
+                image_url=info.get("image_url"),
+                genre=info.get("genres", []),
+                synopsis=info.get("synopsis")
             ))
 
         return SearchResponse(results=results, total=total_count, limit=limit, offset=offset)
