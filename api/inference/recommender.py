@@ -78,8 +78,15 @@ def get_recommendations(
 
     # Build result DataFrame with metadata
     recommended = anime_df[anime_df['anime_id'].isin(top_anime_ids)].copy()
-    recommended = recommended.set_index('anime_id').loc[top_anime_ids]
-    recommended['score'] = scores[top_indices]
+
+    # Filter to only IDs that exist in the DataFrame to avoid KeyError
+    existing_ids = [aid for aid in top_anime_ids if aid in recommended['anime_id'].values]
+    if not existing_ids:
+        return pd.DataFrame(columns=['anime_id', 'name', 'score'])
+
+    recommended = recommended.set_index('anime_id').loc[existing_ids]
+    id_to_score = {anime_ids[i]: scores[i] for i in top_indices}
+    recommended['score'] = [id_to_score[aid] for aid in existing_ids]
     recommended = recommended.reset_index()
 
     # Select output columns

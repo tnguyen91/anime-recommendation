@@ -356,7 +356,7 @@ async function fetchMoreRecommendations(){
   if (needed <= 0) return;
 
   try {
-    const res = await timeoutFetch(`${API_BASE_URL}/recommend`, {
+    const res = await timeoutFetch(`${API_BASE_URL}/api/v1/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
@@ -466,7 +466,7 @@ const doSearch = debounce(async (q) => {
   state.lastQuery = q;
   setLoading(els.suggestions, true);
   try {
-    const res = await timeoutFetch(`${API_BASE_URL}/search-anime?query=${encodeURIComponent(q)}`, { headers: { "Accept": "application/json" } });
+    const res = await timeoutFetch(`${API_BASE_URL}/api/v1/search-anime?query=${encodeURIComponent(q)}`, { headers: { "Accept": "application/json" } });
     if (!res.ok) {
       if (res.status === 404) {
         els.suggestions.innerHTML = '<p class="muted">No anime found matching your search.</p>';
@@ -509,7 +509,7 @@ els.getRecsBtn.addEventListener('click', async () => {
   state.recommendations = [];
 
   try{
-    const res = await timeoutFetch(`${API_BASE_URL}/recommend`, {
+    const res = await timeoutFetch(`${API_BASE_URL}/api/v1/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept':'application/json' },
       body: JSON.stringify({ liked_anime: likedAnime, top_n: DISPLAY_COUNT })
