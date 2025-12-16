@@ -11,7 +11,6 @@ sys.path.insert(0, PROJECT_ROOT)
 
 import api.main as api
 
-
 @pytest.fixture()
 def client():
     with (
@@ -76,7 +75,6 @@ def test_search_anime_empty_query(client):
     assert payload["limit"] == 20
     assert payload["offset"] == 0
 
-
 def test_search_anime_missing_query(client):
     """Omitted query parameter defaults to empty string."""
     response = client.get("/api/v1/search-anime")
@@ -118,13 +116,11 @@ def test_search_anime_query_too_long(client):
     assert response.status_code == 400
     assert "Query too long" in response.json()["detail"]
 
-
 def test_search_anime_invalid_chars(client):
     """Dangerous characters should be rejected."""
     response = client.get("/api/v1/search-anime?query=<script>")
     assert response.status_code == 400
     assert "Invalid characters" in response.json()["detail"]
-
 
 def test_search_anime_pagination(client):
     """Test pagination parameters work correctly."""
@@ -142,7 +138,6 @@ def test_search_anime_pagination(client):
     assert response.status_code == 400
     assert "Offset must be non-negative" in response.json()["detail"]
 
-
 def test_recommend_endpoint_success(client):
     """Valid liked anime returns recommendation payload."""
     with patch('api.main.get_recommendations') as mock_get_recommendations:
@@ -155,3 +150,68 @@ def test_recommend_endpoint_success(client):
         payload = response.json()
         assert payload["recommendations"][0]["anime_id"] == 2
         mock_get_recommendations.assert_called_once()
+
+def test_recommend_endpoint_with_exclude_ids(client):
+    """Exclude IDs are passed to the recommendation function."""
+    with patch('api.main.get_recommendations') as mock_get_recommendations:
+        mock_get_recommendations.return_value = pd.DataFrame([
+            {"anime_id": 2, "name": "Another Title", "score": 0.9}
+        ])
+
+        response = client.post("/api/v1/recommend", json={
+            "liked_anime": ["Sample Anime"],
+            "exclude_ids": [1, 3, 5]
+        })
+        assert response.status_code == 200
+
+        call_kwargs = mock_get_recommendations.call_args
+        assert call_kwargs.kwargs["exclude_ids"] == [1, 3, 5]
+
+def test_recommend_endpoint_exclude_ids_limit(client):
+    """Exclude IDs are limited to 200 items."""
+    with patch('api.main.get_recommendations') as mock_get_recommendations:
+        mock_get_recommendations.return_value = pd.DataFrame([
+            {"anime_id": 2, "name": "Another Title", "score": 0.9}
+        ])
+
+        large_exclude_list = list(range(300))
+        response = client.post("/api/v1/recommend", json={
+            "liked_anime": ["Sample Anime"],
+            "exclude_ids": large_exclude_list
+        })
+        assert response.status_code == 200
+
+        call_kwargs = mock_get_recommendations.call_args
+        assert len(call_kwargs.kwargs["exclude_ids"]) == 200
+
+def test_recommend_endpoint_empty_exclude_ids(client):
+    """Empty exclude_ids list works correctly."""
+    with patch('api.main.get_recommendations') as mock_get_recommendations:
+        mock_get_recommendations.return_value = pd.DataFrame([
+            {"anime_id": 2, "name": "Another Title", "score": 0.9}
+        ])
+
+        response = client.post("/api/v1/recommend", json={
+            "liked_anime": ["Sample Anime"],
+            "exclude_ids": []
+        })
+        assert response.status_code == 200
+
+        call_kwargs = mock_get_recommendations.call_args
+        assert call_kwargs.kwargs["exclude_ids"] == []
+
+def test_recommend_endpoint_top_n_limit(client):
+    """Top N is limited to 50."""
+    with patch('api.main.get_recommendations') as mock_get_recommendations:
+        mock_get_recommendations.return_value = pd.DataFrame([
+            {"anime_id": 2, "name": "Another Title", "score": 0.9}
+        ])
+
+        response = client.post("/api/v1/recommend", json={
+            "liked_anime": ["Sample Anime"],
+            "top_n": 100
+        })
+        assert response.status_code == 200
+
+        call_kwargs = mock_get_recommendations.call_args
+        assert call_kwargs.kwargs["top_n"] == 50

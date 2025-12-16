@@ -33,7 +33,14 @@ jobs:
           pip install -r api/requirements.txt
           pip install pytest pytest-cov httpx
 
-      # --cov=api: measure coverage for the api/ directory
-      # --cov-report=term-missing: show which lines are not covered
-      - name: Run tests
-        run: pytest api/tests/ -v --cov=api --cov-report=term-missing
+      - name: Run tests with coverage
+        run: pytest api/tests/ -v --cov=api --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

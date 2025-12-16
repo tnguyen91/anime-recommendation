@@ -1,6 +1,7 @@
 # Anime Recommendation System
 
 [![Tests](https://github.com/tnguyen91/anime-recommendation/actions/workflows/test.yml/badge.svg)](https://github.com/tnguyen91/anime-recommendation/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/tnguyen91/anime-recommendation/branch/master/graph/badge.svg)](https://codecov.io/gh/tnguyen91/anime-recommendation)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.116-009688.svg)](https://fastapi.tiangolo.com)
