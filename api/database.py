@@ -6,22 +6,23 @@ a dependency function for FastAPI to inject database sessions into endpoints.
 
 Usage:
     from api.database import get_db, Base
-    
+
     # In your models:
     class User(Base):
         __tablename__ = "users"
         ...
-    
+
     # In your endpoints:
     @router.get("/users")
     def get_users(db: Session = Depends(get_db)):
         return db.query(User).all()
 """
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+from settings import settings
+
+DATABASE_URL = settings.get_database_url()
 
 Base = declarative_base()
 

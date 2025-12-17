@@ -9,4 +9,6 @@ not the production PostgreSQL database.
 """
 import os
 
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-testing-only")
+# Set required environment variables for testing BEFORE importing settings
+# JWT_SECRET_KEY must be at least 16 characters (validated by Pydantic)
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-testing-only-min-16-chars")

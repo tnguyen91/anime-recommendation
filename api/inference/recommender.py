@@ -18,7 +18,6 @@ import torch
 
 from api.config import DEFAULT_TOP_N
 
-
 def get_recommendations(
     input_vector: Sequence[int] | torch.Tensor,
     rbm: torch.nn.Module,

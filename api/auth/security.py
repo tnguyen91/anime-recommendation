@@ -9,25 +9,21 @@ JWT (JSON Web Tokens):
     - Stateless authentication - no server-side sessions needed
     - Token contains user ID and expiration time
     - Signed with SECRET_KEY to prevent tampering
-    
-Environment Variables:
-    - JWT_SECRET_KEY: Required. Used to sign/verify tokens.
-    - JWT_ALGORITHM: Optional. Default is HS256.
-    - JWT_ACCESS_TOKEN_EXPIRE_MINUTES: Optional. Default is 30.
+
+Configuration is loaded from centralized settings (see settings.py).
 """
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import bcrypt
 from jose import JWTError, jwt
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("JWT_SECRET_KEY environment variable must be set")
+from settings import settings
 
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+# JWT configuration from centralized settings
+SECRET_KEY = settings.jwt_secret_key
+ALGORITHM = settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_access_token_expire_minutes
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
