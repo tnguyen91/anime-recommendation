@@ -30,9 +30,7 @@ class _TestableSettings(BaseSettings):
     jwt_access_token_expire_minutes: int = Field(default=30, ge=1, le=43200)
 
     cache_dir: Path = Field(default=Path("/tmp/cache"))
-    allowed_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:8080", "http://localhost:3000"]
-    )
+    allowed_origins: str = Field(default="http://localhost:8080,http://localhost:3000")
     log_level: str = Field(default="INFO")
 
     @field_validator("cache_dir", mode="before")
@@ -40,12 +38,20 @@ class _TestableSettings(BaseSettings):
     def resolve_cache_dir(cls, v: str | Path) -> Path:
         return Path(v).resolve() if isinstance(v, str) else v.resolve()
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    def get_allowed_origins(self) -> list[str]:
+        """Parse origins from JSON array or comma-separated string."""
+        v = self.allowed_origins.strip()
+        # Handle JSON array format
+        if v.startswith("["):
+            import json
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [str(origin).strip() for origin in parsed if origin]
+            except json.JSONDecodeError:
+                pass
+        # Fall back to comma-separated
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     @field_validator("log_level")
     @classmethod
@@ -110,16 +116,9 @@ class TestSettings:
             jwt_secret_key="this-is-a-valid-secret-key-123",
             allowed_origins="http://localhost:3000,http://localhost:8080"
         )
-        assert "http://localhost:3000" in s.allowed_origins
-        assert "http://localhost:8080" in s.allowed_origins
-
-    def test_allowed_origins_from_list(self):
-        """Accepts list of origins directly."""
-        s = Settings(
-            jwt_secret_key="this-is-a-valid-secret-key-123",
-            allowed_origins=["http://localhost:3000"]
-        )
-        assert s.allowed_origins == ["http://localhost:3000"]
+        origins = s.get_allowed_origins()
+        assert "http://localhost:3000" in origins
+        assert "http://localhost:8080" in origins
 
     def test_allowed_origins_from_json_string(self):
         """Parses JSON array string for origins."""
@@ -127,8 +126,9 @@ class TestSettings:
             jwt_secret_key="this-is-a-valid-secret-key-123",
             allowed_origins='["http://localhost:3000", "http://example.com"]'
         )
-        assert "http://localhost:3000" in s.allowed_origins
-        assert "http://example.com" in s.allowed_origins
+        origins = s.get_allowed_origins()
+        assert "http://localhost:3000" in origins
+        assert "http://example.com" in origins
 
     def test_log_level_validation(self):
         """Log level must be valid."""

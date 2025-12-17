@@ -43,10 +43,8 @@ class Settings(BaseSettings):
     anime_csv_uri: str | None = Field(default=None)
     user_review_csv_uri: str | None = Field(default=None)
 
-    # CORS
-    allowed_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:8080", "http://localhost:3000"]
-    )
+    # CORS - Use str type to prevent Pydantic's auto-JSON parsing of env vars
+    allowed_origins: str = Field(default="http://localhost:8080,http://localhost:3000")
 
     # Logging
     log_level: str = Field(default="INFO")
@@ -57,26 +55,20 @@ class Settings(BaseSettings):
         """Resolve to absolute path."""
         return Path(v).resolve() if isinstance(v, str) else v.resolve()
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v: str | list[str]) -> list[str]:
+    def get_allowed_origins(self) -> list[str]:
         """Parse origins from JSON array or comma-separated string."""
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            v = v.strip()
-            # Handle JSON array format
-            if v.startswith("["):
-                import json
-                try:
-                    parsed = json.loads(v)
-                    if isinstance(parsed, list):
-                        return [str(origin).strip() for origin in parsed if origin]
-                except json.JSONDecodeError:
-                    pass
-            # Fall back to comma-separated
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return []
+        v = self.allowed_origins.strip()
+        # Handle JSON array format
+        if v.startswith("["):
+            import json
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [str(origin).strip() for origin in parsed if origin]
+            except json.JSONDecodeError:
+                pass
+        # Fall back to comma-separated
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     @field_validator("log_level")
     @classmethod
