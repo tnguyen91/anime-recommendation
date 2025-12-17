@@ -121,6 +121,15 @@ class TestSettings:
         )
         assert s.allowed_origins == ["http://localhost:3000"]
 
+    def test_allowed_origins_from_json_string(self):
+        """Parses JSON array string for origins."""
+        s = Settings(
+            jwt_secret_key="this-is-a-valid-secret-key-123",
+            allowed_origins='["http://localhost:3000", "http://example.com"]'
+        )
+        assert "http://localhost:3000" in s.allowed_origins
+        assert "http://example.com" in s.allowed_origins
+
     def test_log_level_validation(self):
         """Log level must be valid."""
         with pytest.raises(Exception):

@@ -60,10 +60,23 @@ class Settings(BaseSettings):
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def parse_allowed_origins(cls, v: str | list[str]) -> list[str]:
-        """Parse comma-separated origins string."""
+        """Parse origins from JSON array or comma-separated string."""
+        if isinstance(v, list):
+            return v
         if isinstance(v, str):
+            v = v.strip()
+            # Handle JSON array format
+            if v.startswith("["):
+                import json
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(origin).strip() for origin in parsed if origin]
+                except json.JSONDecodeError:
+                    pass
+            # Fall back to comma-separated
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        return []
 
     @field_validator("log_level")
     @classmethod
