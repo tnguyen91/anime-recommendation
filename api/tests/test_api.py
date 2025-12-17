@@ -37,12 +37,12 @@ def client():
         mock_rbm.return_value = rbm_instance
 
         with TestClient(api.app) as test_client:
-            api.anime_df = mock_anime_df.copy()
-            api.ratings_df = mock_ratings.copy()
-            api.user_anime = mock_user_anime.copy()
-            api.anime_ids = list(mock_user_anime.columns)
-            api.rbm = rbm_instance
-            api.anime_metadata = {
+            # Set up app state for dependency injection
+            app_state = api.app.state.app_state
+            app_state.anime_df = mock_anime_df.copy()
+            app_state.rbm = rbm_instance
+            app_state.anime_ids = list(mock_user_anime.columns)
+            app_state.anime_metadata = {
                 "1": {
                     "image_url": "https://example.com/sample.jpg",
                     "genres": ["Action"],
@@ -54,6 +54,12 @@ def client():
                     "synopsis": "Sample synopsis"
                 }
             }
+            # Also set module-level vars for backwards compatibility
+            api.anime_df = mock_anime_df.copy()
+            api.ratings_df = mock_ratings.copy()
+            api.user_anime = mock_user_anime.copy()
+            api.anime_ids = list(mock_user_anime.columns)
+            api.rbm = rbm_instance
             yield test_client
 
 def test_health_endpoint(client):
