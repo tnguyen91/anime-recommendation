@@ -35,7 +35,7 @@ from api.inference.recommender import get_recommendations
 from api.auth.router import router as auth_router
 from api.favorites.router import router as favorites_router
 from api.anime_cache import set_anime_cache
-from settings import settings
+from api.settings import settings
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level),

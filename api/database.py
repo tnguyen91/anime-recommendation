@@ -7,7 +7,7 @@ Provides FastAPI dependency for database session injection.
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-from settings import settings
+from api.settings import settings
 
 DATABASE_URL = settings.get_database_url()
 

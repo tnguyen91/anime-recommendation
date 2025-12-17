@@ -9,7 +9,7 @@ from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
 
-from settings import settings
+from api.settings import settings
 
 # JWT configuration from centralized settings
 SECRET_KEY = settings.jwt_secret_key
