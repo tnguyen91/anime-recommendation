@@ -1,3 +1,4 @@
+"""RBM training with contrastive divergence and early stopping."""
 import os
 import sys
 import torch

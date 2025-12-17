@@ -1,19 +1,4 @@
-"""
-Anime metadata cache for enriching favorites and recommendations.
-
-This module provides a shared cache of anime metadata (titles, images, etc.)
-that is populated at application startup and used to enrich API responses.
-
-The cache avoids circular imports between main.py and favorites/router.py
-by providing a clean interface for accessing metadata.
-
-Usage:
-    # At startup (in main.py lifespan):
-    set_anime_cache(anime_metadata, anime_df)
-    
-    # When enriching responses:
-    info = get_anime_info(anime_id)  # Returns {"name": ..., "image_url": ...}
-"""
+"""Anime metadata cache for enriching API responses."""
 from typing import Any
 
 _anime_metadata: dict[str, Any] = {}
@@ -21,25 +6,14 @@ _anime_df = None
 
 
 def set_anime_cache(metadata: dict, df) -> None:
-    """
-    Initialize the anime cache with metadata and dataframe.
-    
-    Called once during application startup.
-    """
+    """Initialize the anime cache at startup."""
     global _anime_metadata, _anime_df
     _anime_metadata = metadata
     _anime_df = df
 
 
 def get_anime_info(anime_id: int) -> dict:
-    """
-    Get anime info by ID from the cached metadata.
-    
-    Tries metadata dict first, falls back to dataframe if available.
-    
-    Returns:
-        Dict with name, title_english, image_url (any may be None)
-    """
+    """Retrieve anime metadata by ID."""
     info = {}
 
     metadata = _anime_metadata.get(str(anime_id)) or _anime_metadata.get(anime_id, {})

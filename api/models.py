@@ -1,14 +1,4 @@
-"""
-SQLAlchemy database models.
-
-These classes define the structure of database tables. SQLAlchemy uses these
-to generate SQL and map database rows to Python objects.
-
-Tables:
-    - users: User accounts with authentication info
-    - user_favorites: Anime saved by users
-    - recommendation_history: (Future) Track recommendation engagement
-"""
+"""SQLAlchemy database models for users, favorites, and recommendation tracking."""
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -52,12 +42,7 @@ class UserFavorite(Base):
 
 
 class RecommendationHistory(Base):
-    """
-    Track recommendation engagement for future model improvements.
-
-    Stores user interactions with recommendations to enable feedback-based
-    model refinement (e.g., click-through rate optimization).
-    """
+    """Recommendation engagement tracking for model improvement."""
     __tablename__ = "recommendation_history"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

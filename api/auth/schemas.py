@@ -1,12 +1,4 @@
-"""
-Pydantic schemas for authentication requests and responses.
-
-Schemas define the shape of data for API requests and responses.
-They provide automatic validation, serialization, and API documentation.
-
-Note: Login uses OAuth2PasswordRequestForm (username + password form data),
-not a JSON body, so there's no UserLogin schema needed.
-"""
+"""Pydantic schemas for authentication requests and responses."""
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 

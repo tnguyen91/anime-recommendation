@@ -1,8 +1,11 @@
+"""Restricted Boltzmann Machine for collaborative filtering."""
 import torch
 import torch.nn as nn
 from typing import Tuple
 
+
 class RBM(nn.Module):
+    """RBM with Gibbs sampling for recommendation inference."""
     def __init__(self, n_visible, n_hidden):
         super().__init__()
         self.n_visible = n_visible

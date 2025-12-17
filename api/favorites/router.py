@@ -1,16 +1,4 @@
-"""
-Favorites API endpoints.
-
-Allows authenticated users to manage their favorite anime list.
-All endpoints require JWT authentication.
-
-Endpoints:
-    GET    /favorites              - List user's favorites
-    POST   /favorites              - Add anime to favorites
-    DELETE /favorites/{id}         - Remove by favorite ID
-    DELETE /favorites/anime/{id}   - Remove by anime ID  
-    GET    /favorites/check/{id}   - Check if anime is favorited
-"""
+"""Favorites API endpoints for managing user's favorite anime list."""
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status

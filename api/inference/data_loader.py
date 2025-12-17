@@ -1,14 +1,4 @@
-"""
-Anime dataset loader for the recommendation system.
-
-Downloads and loads anime metadata and user review datasets from configured
-URIs. Datasets are cached locally for performance. Adult content is filtered
-out during loading.
-
-Environment Variables:
-    ANIME_CSV_URI: URL to the anime metadata CSV
-    USER_REVIEW_CSV_URI: URL to the user reviews CSV
-"""
+"""Anime dataset loader with caching and content filtering."""
 from __future__ import annotations
 import os
 from typing import Tuple
@@ -18,20 +8,7 @@ from .downloads import download_to_cache
 
 
 def load_anime_dataset() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Load and preprocess anime datasets from remote URIs.
-
-    Downloads datasets if not cached, filters adult content, and returns
-    clean DataFrames ready for the recommendation model.
-
-    Returns:
-        Tuple of (ratings_df, anime_df) with adult content removed
-
-    Raises:
-        EnvironmentError: If required URI environment variables are not set
-        RuntimeError: If download fails
-        FileNotFoundError: If cached files are missing after download
-    """
+    """Load and preprocess anime datasets from configured URIs."""
     anime_uri = os.environ.get("ANIME_CSV_URI")
     review_uri = os.environ.get("USER_REVIEW_CSV_URI")
 

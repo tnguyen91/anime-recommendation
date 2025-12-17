@@ -1,6 +1,9 @@
+"""Ranking evaluation metrics: Precision@K, MAP@K, NDCG@K."""
 import torch
 
+
 def evaluate_at_k(rbm, train_tensor, test_tensor, k=10, device='cpu'):
+    """Compute precision, MAP, and NDCG at K for recommendation evaluation."""
     rbm.eval()
     train_tensor = train_tensor.to(device)
     test_tensor = test_tensor.to(device)

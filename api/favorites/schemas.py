@@ -1,8 +1,4 @@
-"""
-Pydantic schemas for favorites requests and responses.
-
-These schemas validate and document the favorites API.
-"""
+"""Pydantic schemas for favorites API."""
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field

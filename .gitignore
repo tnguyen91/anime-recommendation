@@ -1,36 +1,100 @@
+# =============================================================================
+# Python
+# =============================================================================
 __pycache__/
-.pytest_cache/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+*.egg
+
+# =============================================================================
+# Virtual Environments
+# =============================================================================
 env/
 venv/
 .venv/
-datasets/
-*.pth
-*.csv
-.env
-.ipynb_checkpoints
-.json
+ENV/
 
+# =============================================================================
+# Testing & Coverage
+# =============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# =============================================================================
+# Jupyter Notebooks
+# =============================================================================
+.ipynb_checkpoints/
+
+# =============================================================================
+# IDE & Editors
+# =============================================================================
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
+# =============================================================================
+# OS Files
+# =============================================================================
 .DS_Store
 Thumbs.db
 
-anime-recommender-ui/node_modules/
-anime-recommender-ui/build/
-anime-recommender-ui/.next/
-anime-recommender-ui/.env
-
+# =============================================================================
+# Project-Specific: Data & Models
+# =============================================================================
+# Large data files (downloaded from Kaggle)
+datasets/
 data/
+
+# Model checkpoints and outputs
+*.pth
 out/
+!out/training_metrics.png
 rbm/out/
-rbm/hyperparameter_tuning.py
 cache/
+
+# =============================================================================
+# Project-Specific: Frontend
+# =============================================================================
+anime-recommendation-ui/node_modules/
+anime-recommendation-ui/build/
+anime-recommendation-ui/.next/
+anime-recommendation-ui/.env
+
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets.json
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
 .claude/
 
-*.md
-!README.md
-
+# Ignore CSV files (data files) but allow specific ones if needed
+*.csv

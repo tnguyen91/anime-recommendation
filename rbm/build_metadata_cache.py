@@ -1,3 +1,4 @@
+"""Build anime metadata cache from Jikan API."""
 import json
 import time
 import requests

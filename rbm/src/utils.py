@@ -1,3 +1,4 @@
+"""Data preprocessing, recommendation generation, and visualization utilities."""
 import matplotlib.pyplot as plt
 import numpy as np
 import os

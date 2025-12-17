@@ -1,3 +1,4 @@
+"""Grid search hyperparameter tuning with resume capability."""
 import csv
 import itertools
 import os
@@ -39,7 +40,6 @@ if target_n_hidden:
         print("Warning: failed to parse TARGET_N_HIDDEN; ignoring")
 
 ratings, anime = load_anime_dataset()
-# Seed before preprocessing/splitting so the train/test split is reproducible
 import random as _random
 _random.seed(SEED)
 np.random.seed(SEED)
@@ -60,7 +60,6 @@ test_tensor = torch.FloatTensor(test_array)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using {device}")
 
-# Load already completed configs for resume training
 completed_configs = set()
 results_file = "out/tuning_results.csv"
 if os.path.exists(results_file):
