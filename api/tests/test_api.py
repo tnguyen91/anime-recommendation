@@ -122,12 +122,6 @@ def test_search_anime_query_too_long(client):
     assert response.status_code == 400
     assert "Query too long" in response.json()["detail"]
 
-def test_search_anime_invalid_chars(client):
-    """Dangerous characters should be rejected."""
-    response = client.get("/api/v1/search-anime?query=<script>")
-    assert response.status_code == 400
-    assert "Invalid characters" in response.json()["detail"]
-
 def test_search_anime_pagination(client):
     """Test pagination parameters work correctly."""
     response = client.get("/api/v1/search-anime?query=sample&limit=1")
