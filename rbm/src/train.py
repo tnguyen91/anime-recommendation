@@ -19,6 +19,7 @@ from .evaluate import evaluate_at_k
 
 
 def train_single_batch(rbm, optimizer, batch):
+    """Train RBM on single batch using contrastive divergence."""
     v0 = batch
     ph0, _ = rbm.sample_h(v0)
     _, vk = rbm.sample_v(ph0)
@@ -42,6 +43,7 @@ def train_single_batch(rbm, optimizer, batch):
 
 
 def evaluate_and_log(rbm, train_tensor, test_tensor, k, device, epoch, epoch_loss):
+    """Evaluate model and print metrics for current epoch."""
     rbm.eval()
     with torch.no_grad():
         precision, mean_ap, mean_ndcg = evaluate_at_k(rbm, train_tensor, test_tensor, k=k, device=device)
@@ -50,6 +52,7 @@ def evaluate_and_log(rbm, train_tensor, test_tensor, k, device, epoch, epoch_los
 
 
 def check_early_stopping(mean_ap, best_map, patience_counter, patience, rbm):
+    """Check if training should stop and save best model state."""
     if mean_ap > best_map:
         best_map = mean_ap
         patience_counter = 0
@@ -65,6 +68,7 @@ def check_early_stopping(mean_ap, best_map, patience_counter, patience, rbm):
 
 
 def save_best_model(rbm, best_model_state, best_map, k, model_path: str | None = None):
+    """Save best model checkpoint to disk."""
     if best_model_state is None:
         return
     rbm.load_state_dict(best_model_state)
@@ -80,6 +84,7 @@ def save_best_model(rbm, best_model_state, best_map, k, model_path: str | None =
 def train_rbm(rbm, train_tensor, test_tensor,
               epochs=30, batch_size=32,
               learning_rate=0.001, k=10, device='cpu'):
+    """Train RBM with early stopping and save best model."""
     rbm.to(device)
     train_tensor = train_tensor.to(device)
     test_tensor = test_tensor.to(device)

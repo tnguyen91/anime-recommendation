@@ -18,6 +18,7 @@ from .utils import filter_hentai
 os.environ.setdefault("KAGGLEHUB_CACHE", DATA_DIR)
 
 def _resolve_latest_dataset_version():
+    """Find the latest downloaded dataset version directory."""
     candidates = sorted(glob.glob(DATA_VERSIONS_PATH))
     if not candidates:
         raise FileNotFoundError(
@@ -28,6 +29,7 @@ def _resolve_latest_dataset_version():
 
 
 def load_anime_dataset():
+    """Download and load anime dataset from Kaggle."""
     kagglehub.dataset_download(KAGGLE_DATASET)
     latest_version = _resolve_latest_dataset_version()
     rating_path = os.path.join(latest_version, "User-AnimeReview.csv")

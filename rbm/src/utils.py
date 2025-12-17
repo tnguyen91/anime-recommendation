@@ -23,12 +23,15 @@ except ImportError:
     )
 
 def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Remove adult content from datasets."""
     mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)
     anime_clean = anime[mask]
     ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['anime_id'])]
     return ratings_clean, anime_clean
 
+
 def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
+    """Filter to active users and popular anime for reduced sparsity."""
     ratings_df = ratings_df.copy()
     ratings_df = ratings_df[ratings_df['status'] == 'Completed']
     ratings_df['liked'] = (ratings_df['score'] >= RATING_THRESHOLD).astype(int)
@@ -51,6 +54,7 @@ def preprocess_data(ratings_df, min_likes_user=100, min_likes_anime=50):
     return user_anime, ratings_df
 
 def make_train_test_split(data, holdout_ratio=0.1, seed=SEED):
+    """Split user-anime matrix into train/test with per-user holdout."""
     np.random.seed(seed)
     train = data.copy()
     test = np.zeros(data.shape)
@@ -65,6 +69,7 @@ def make_train_test_split(data, holdout_ratio=0.1, seed=SEED):
     return train, test
 
 def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=DEFAULT_TOP_N, device='cpu'):
+    """Generate top-N anime recommendations from RBM reconstruction."""
     rbm.eval()
 
     if isinstance(input_vector, (list, np.ndarray)):
@@ -92,6 +97,7 @@ def get_recommendations(input_vector, rbm, anime_ids, anime_df, top_n=DEFAULT_TO
   
 
 def generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n):
+    """Generate recommendation scores for all users in batch."""
     rbm.eval()
     with torch.no_grad():
         p_h, _ = rbm.sample_h(input_tensor)
@@ -102,6 +108,7 @@ def generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n):
     return scores
 
 def process_user_recommendations(user_id, user_scores, anime_ids, anime_df, test_vector, top_n):
+    """Build recommendation list for a single user with held-out flags."""
     top_indices = user_scores.argsort()[::-1][:top_n]
     top_anime_ids = [anime_ids[j] for j in top_indices]
     
@@ -126,6 +133,7 @@ def process_user_recommendations(user_id, user_scores, anime_ids, anime_df, test
 
 def generate_recommendations_csv(rbm, train, test, user_anime, anime,
                                  device='cpu', top_n=DEFAULT_TOP_N, filename: str | None = None):
+    """Generate and save recommendations for all users to CSV."""
     user_ids = list(user_anime.index)
     anime_ids = list(user_anime.columns)
     input_tensor = torch.FloatTensor(train.values).to(device)
@@ -150,6 +158,7 @@ def generate_recommendations_csv(rbm, train, test, user_anime, anime,
     return recommendation_df
 
 def search_anime(anime_df, query):
+    """Search anime by name (searches all title columns)."""
     name_cols = ["name", "title_english", "title_japanese"]
     mask = False
     for col in name_cols:
@@ -158,9 +167,11 @@ def search_anime(anime_df, query):
     return matches[["anime_id"] + name_cols]
 
 def make_input_vector(liked_anime_ids, anime_ids):
+    """Create binary input vector from liked anime IDs."""
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def plot_training_metrics(losses, precs, maps, ndcgs, K):
+    """Plot and save training metrics over epochs."""
     plt.figure(figsize=DEFAULT_FIGURE_SIZE)
     plt.plot(losses, label="Loss")
     plt.plot(precs, label=f"Precision@{K}")
@@ -177,8 +188,9 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     plt.show()
 
 def collect_user_preferences(anime_df):
+    """Interactive CLI to collect user's liked anime."""
     liked_anime_ids = []
-    
+
     print("\n=== Anime Recommendation CLI ===")
     print("Search and select anime you like (press Enter without typing to finish):")
     
@@ -201,6 +213,7 @@ def collect_user_preferences(anime_df):
     return list(set(liked_anime_ids))
 
 def interactive_recommender(user_anime, anime, rbm, device, top_n=DEFAULT_TOP_N):
+    """Run interactive CLI for anime recommendations."""
     anime_ids = list(user_anime.columns)
     
     liked_anime_ids = collect_user_preferences(anime)

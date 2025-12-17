@@ -26,6 +26,7 @@ except Exception:
     )
 
 def load_config():
+    """Load YAML configuration file."""
     config_path = os.path.join(os.path.dirname(__file__), CONFIG_FILE)
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
@@ -44,6 +45,7 @@ for k, v in list(path_cfg.items()):
             path_cfg[k] = os.path.normpath(os.path.join(os.path.dirname(__file__), v))
 
 def load_and_preprocess_data():
+    """Load datasets and preprocess into user-anime matrix."""
     ratings, anime = load_anime_dataset()
     import random as _random
     _random.seed(SEED)
@@ -62,6 +64,7 @@ def load_and_preprocess_data():
 
 
 def prepare_train_test_data(user_anime):
+    """Split data and convert to tensors for training."""
     train_df, test_arr = make_train_test_split(user_anime, holdout_ratio=data_cfg["holdout_ratio"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_tensor = torch.FloatTensor(train_df.values).to(device)
@@ -70,6 +73,7 @@ def prepare_train_test_data(user_anime):
 
 
 def train_workflow(rbm, train_tensor, test_tensor, train_df, test_arr, user_anime, anime, device, **kwargs):
+    """Execute training loop and plot metrics."""
     print(f"Training RBM with n_hidden={kwargs['n_hidden']}, learning_rate={kwargs['learning_rate']}, "
           f"batch_size={kwargs['batch_size']}, epochs={kwargs['epochs']}, k={kwargs['k']} on {device}")
 
@@ -87,6 +91,7 @@ def train_workflow(rbm, train_tensor, test_tensor, train_df, test_arr, user_anim
 
 def main(train_model=True, run_cli=True, n_hidden=None, epochs=None,
          batch_size=None, learning_rate=None, k=None):
+    """Main entry point for training and/or interactive CLI."""
     n_hidden = n_hidden or model_cfg['n_hidden']
     epochs = epochs or model_cfg['epochs']
     batch_size = batch_size or model_cfg['batch_size']

@@ -11,6 +11,7 @@ DELAY = API_DELAY_SECONDS
 
 
 def fetch_anime_info(anime_id):
+    """Fetch anime metadata from Jikan API."""
     try:
         res = requests.get(f"https://api.jikan.moe/v4/anime/{anime_id}")
         res.raise_for_status()
@@ -28,6 +29,7 @@ def fetch_anime_info(anime_id):
 
 
 def build_cache():
+    """Build and save metadata cache for all anime in dataset."""
     ratings, anime_df = load_anime_dataset()
     anime_ids = anime_df["anime_id"].dropna().unique()
     cache = {}
