@@ -131,32 +131,6 @@ def process_user_recommendations(user_id, user_scores, anime_ids, anime_df, test
     
     return user_recommendations
 
-def generate_recommendations_csv(rbm, train, test, user_anime, anime,
-                                 device='cpu', top_n=DEFAULT_TOP_N, filename: str | None = None):
-    """Generate and save recommendations for all users to CSV."""
-    user_ids = list(user_anime.index)
-    anime_ids = list(user_anime.columns)
-    input_tensor = torch.FloatTensor(train.values).to(device)
-
-    scores = generate_batch_recommendations(rbm, input_tensor, anime_ids, device, top_n)
-    
-    recommendation_rows = []
-    for i, user_id in enumerate(user_ids):
-        user_recs = process_user_recommendations(
-            user_id, scores[i], anime_ids, anime, test[i], top_n
-        )
-        recommendation_rows.extend(user_recs)
-
-    recommendation_df = pd.DataFrame(recommendation_rows)
-    if filename is None:
-        filename = os.path.join(OUTPUT_DIR, "recommendations.csv")
-    elif not os.path.isabs(filename):
-        filename = os.path.join(OUTPUT_DIR, os.path.basename(filename))
-    os.makedirs(os.path.dirname(filename) or OUTPUT_DIR, exist_ok=True)
-    recommendation_df.to_csv(filename, index=False)
-    print(f"Recommendations saved to {filename}")
-    return recommendation_df
-
 def search_anime(anime_df, query):
     """Search anime by name (searches all title columns)."""
     name_cols = ["name", "title_english", "title_japanese"]

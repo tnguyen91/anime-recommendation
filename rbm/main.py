@@ -47,7 +47,6 @@ for k, v in list(path_cfg.items()):
 def load_and_preprocess_data():
     """Load datasets and preprocess into user-anime matrix."""
     ratings, anime = load_anime_dataset()
-    import random as _random
     _random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)

@@ -40,8 +40,6 @@ class Settings(BaseSettings):
     cache_dir: Path = Field(default=Path("/tmp/cache"))
     model_uri: str | None = Field(default=None)
     metadata_uri: str | None = Field(default=None)
-    anime_csv_uri: str | None = Field(default=None)
-    user_review_csv_uri: str | None = Field(default=None)
 
     # CORS - Use str type to prevent Pydantic's auto-JSON parsing of env vars
     allowed_origins: str = Field(default="http://localhost:8080,http://localhost:3000")

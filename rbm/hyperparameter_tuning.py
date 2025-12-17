@@ -2,7 +2,7 @@
 import csv
 import itertools
 import os
-import random
+import random as _random
 import numpy as np
 import torch
 import yaml
@@ -19,7 +19,7 @@ from rbm.src.model import RBM
 from rbm.src.train import train_rbm
 from rbm.src.utils import preprocess_data, make_train_test_split
 
-random.seed(SEED)
+_random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
@@ -40,7 +40,6 @@ if target_n_hidden:
         print("Warning: failed to parse TARGET_N_HIDDEN; ignoring")
 
 ratings, anime = load_anime_dataset()
-import random as _random
 _random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
