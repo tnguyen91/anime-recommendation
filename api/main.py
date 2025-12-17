@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import pandas as pd
 import torch
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request, APIRouter
+from fastapi import Depends, FastAPI, HTTPException, Request, APIRouter, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -19,14 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from api.app_state import AppState, init_app_state
-from api.config import (
-    DEFAULT_TOP_N,
-    HTTP_BAD_REQUEST,
-    HTTP_INTERNAL_ERROR,
-    MIN_LIKES_ANIME,
-    MIN_LIKES_USER,
-    N_HIDDEN,
-)
+from api.config import DEFAULT_TOP_N, MIN_LIKES_ANIME, MIN_LIKES_USER, N_HIDDEN
 from api.inference.data_loader import load_anime_dataset
 from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
@@ -34,7 +27,6 @@ from api.inference.preprocess import filter_data
 from api.inference.recommender import get_recommendations
 from api.auth.router import router as auth_router
 from api.favorites.router import router as favorites_router
-from api.anime_cache import set_anime_cache
 from api.settings import settings
 
 logging.basicConfig(
@@ -88,22 +80,12 @@ def _safe_str(value) -> str:
     return "" if pd.isnull(value) else str(value)
 
 
-def _load_model(model_path, expected_n_visible: int, device: torch.device):
-    """Load and validate RBM checkpoint."""
+def _load_model(model_path, device: torch.device) -> dict:
+    """Load RBM checkpoint from file."""
     ckpt = torch.load(model_path, map_location=device)
-
-    if isinstance(ckpt, dict) and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
-        state_dict = ckpt
-    else:
-        state_dict = ckpt.get('state_dict', ckpt.get('model_state_dict', ckpt))
-
-    for key, tensor in state_dict.items():
-        if key.endswith('v_bias') and tensor.shape[0] != expected_n_visible:
-            raise RuntimeError(f"Checkpoint v_bias shape {tensor.shape[0]} != expected {expected_n_visible}")
-        if key.endswith('W') and tensor.shape[1] != expected_n_visible:
-            raise RuntimeError(f"Checkpoint W shape {tensor.shape[1]} != expected {expected_n_visible}")
-
-    return state_dict
+    if isinstance(ckpt, dict) and "W" in ckpt:
+        return ckpt
+    return ckpt.get("state_dict", ckpt.get("model_state_dict", ckpt))
 
 
 def _build_anime_result(row: pd.Series, app_state: AppState) -> AnimeResult:
@@ -158,7 +140,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"Loading model from {settings.model_uri}...")
             model_path = download_to_cache(settings.model_uri)
             if model_path.exists():
-                state_dict = _load_model(model_path, len(app_state.anime_ids), app_state.device)
+                state_dict = _load_model(model_path, app_state.device)
                 app_state.rbm.load_state_dict(state_dict)
                 logger.info("Model loaded successfully")
 
@@ -172,8 +154,6 @@ async def lifespan(app: FastAPI):
             app_state.load_anime_csv(p)
             logger.info(f"Loaded anime data from cache: {p.name}")
             break
-
-    set_anime_cache(app_state.anime_metadata, app_state.anime_df)
 
     app_state.is_initialized = True
     logger.info("Startup complete")
@@ -239,14 +219,14 @@ async def recommend(
 ):
     """Get personalized anime recommendations based on liked titles."""
     if not body.liked_anime:
-        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="liked_anime must be a non-empty list")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="liked_anime must be a non-empty list")
 
     if app_state.anime_df is None:
-        raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Dataset not loaded")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Dataset not loaded")
 
     matched_ids = app_state.anime_df[app_state.anime_df["name"].isin(body.liked_anime)]["anime_id"].tolist()
     if not matched_ids:
-        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="No matching anime found")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No matching anime found")
 
     try:
         top_n = min(body.top_n, 50)
@@ -270,7 +250,7 @@ async def recommend(
 
     except Exception:
         logger.exception(f"Error generating recommendations for: {body.liked_anime}")
-        raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while generating recommendations")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error while generating recommendations")
 
 
 @v1_router.get("/search-anime", response_model=SearchResponse, tags=["Search"])
@@ -286,22 +266,18 @@ async def search_anime(
     query = (query or "").strip()
 
     if limit < 1 or limit > 100:
-        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Limit must be between 1 and 100")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Limit must be between 1 and 100")
     if offset < 0:
-        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Offset must be non-negative")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Offset must be non-negative")
 
     if not query:
         return SearchResponse(results=[], total=0, limit=limit, offset=offset)
 
     if len(query) > 100:
-        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Query too long (max 100 chars)")
-
-    dangerous_chars = ['<', '>', '"', "'", ';', '--', '/*', '*/']
-    if any(char in query for char in dangerous_chars):
-        raise HTTPException(status_code=HTTP_BAD_REQUEST, detail="Invalid characters in search query")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query too long (max 100 chars)")
 
     if app_state.anime_df is None:
-        raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Dataset not loaded")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Dataset not loaded")
 
     try:
         anime_df = app_state.anime_df
@@ -332,7 +308,7 @@ async def search_anime(
 
     except Exception:
         logger.exception(f"Error searching anime with query: {query}")
-        raise HTTPException(status_code=HTTP_INTERNAL_ERROR, detail="Internal server error while searching anime")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error while searching anime")
 
 
 # --- Router Registration ---

@@ -1,24 +1,30 @@
+"""
+File download utilities with caching and retry support.
+
+Provides robust file downloading with automatic retries, checksum validation,
+and local caching to avoid redundant downloads.
+"""
 from __future__ import annotations
+
 import hashlib
 import os
 import tempfile
 from pathlib import Path
 from typing import Callable, Optional, Tuple, Union
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 _env_cache = os.environ.get("CACHE_DIR")
-if _env_cache:
-    CACHE_DIR = Path(_env_cache).resolve()
-else:
-    CACHE_DIR = Path("/tmp/cache").resolve()
-
+CACHE_DIR = Path(_env_cache).resolve() if _env_cache else Path("/tmp/cache").resolve()
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 ProgressCallback = Callable[[int, int], None]
 
+
 def _build_session(max_retries: int = 3, backoff_factor: float = 0.5) -> requests.Session:
+    """Create requests session with retry configuration."""
     session = requests.Session()
     retry = Retry(
         total=max_retries,
@@ -35,6 +41,7 @@ def _build_session(max_retries: int = 3, backoff_factor: float = 0.5) -> request
     session.headers.update({"User-Agent": "anime-recommender/1.0"})
     return session
 
+
 def download_file(
     url: str,
     destination_folder: str = ".",
@@ -45,7 +52,12 @@ def download_file(
     chunk_size: int = 64 * 1024,
     session: Optional[requests.Session] = None,
 ) -> Path:
+    """
+    Download file from URL with caching and optional checksum validation.
 
+    Returns cached file if it exists, otherwise downloads to temp file
+    and atomically moves to final destination.
+    """
     dest_dir = Path(destination_folder)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -104,6 +116,8 @@ def download_file(
             tmp_path.unlink(missing_ok=True)
             raise
 
+
 def download_to_cache(url: str, **kwargs) -> Path:
+    """Download file to cache directory."""
     filename = Path(url.split("/")[-1]).name or "download"
     return download_file(url, destination_folder=str(CACHE_DIR), filename=filename, **kwargs)

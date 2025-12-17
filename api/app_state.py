@@ -42,6 +42,25 @@ class AppState:
             or self.anime_metadata.get(anime_id, {})
         )
 
+    def get_anime_info(self, anime_id: int) -> dict[str, Any]:
+        """Get anime info from metadata or DataFrame for API responses."""
+        info: dict[str, Any] = {}
+
+        metadata = self.get_metadata(anime_id)
+        if metadata:
+            info["name"] = metadata.get("title") or metadata.get("name")
+            info["title_english"] = metadata.get("title_english")
+            info["image_url"] = metadata.get("image_url")
+
+        if not info.get("name") and self.anime_df is not None:
+            match = self.anime_df[self.anime_df["anime_id"] == anime_id]
+            if not match.empty:
+                row = match.iloc[0]
+                info["name"] = row.get("name", "")
+                info["title_english"] = row.get("title_english")
+
+        return info
+
     @property
     def model_loaded(self) -> bool:
         return self.rbm is not None

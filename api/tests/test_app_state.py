@@ -73,6 +73,29 @@ class TestAppState:
         result = state.get_metadata(999)
         assert result == {}
 
+    def test_get_anime_info_from_metadata(self):
+        """get_anime_info returns info from metadata."""
+        state = AppState()
+        state.anime_metadata = {"123": {"title": "Test Anime", "title_english": "Test EN", "image_url": "test.jpg"}}
+        result = state.get_anime_info(123)
+        assert result["name"] == "Test Anime"
+        assert result["title_english"] == "Test EN"
+        assert result["image_url"] == "test.jpg"
+
+    def test_get_anime_info_fallback_to_dataframe(self):
+        """get_anime_info falls back to DataFrame when metadata missing."""
+        state = AppState()
+        state.anime_df = pd.DataFrame({"anime_id": [1], "name": ["DF Anime"], "title_english": ["DF EN"]})
+        result = state.get_anime_info(1)
+        assert result["name"] == "DF Anime"
+        assert result["title_english"] == "DF EN"
+
+    def test_get_anime_info_missing(self):
+        """get_anime_info returns empty dict for missing ID."""
+        state = AppState()
+        result = state.get_anime_info(999)
+        assert result == {}
+
     def test_load_metadata_from_file(self):
         """load_metadata reads JSON file correctly."""
         state = AppState()

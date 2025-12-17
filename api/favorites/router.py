@@ -1,10 +1,10 @@
 """Favorites API endpoints for managing user's favorite anime list."""
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from api.anime_cache import get_anime_info
+from api.app_state import AppState
 from api.auth.dependencies import get_current_user
 from api.database import get_db
 from api.favorites.schemas import (
@@ -20,10 +20,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
 
 
+def get_app_state(request: Request) -> AppState:
+    """Dependency injection for application state."""
+    return request.app.state.app_state
+
+
 @router.get("", response_model=FavoriteListResponse)
 async def list_favorites(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    app_state: AppState = Depends(get_app_state)
 ):
     """List all favorite anime for the current user."""
     favorites = (
@@ -32,10 +38,10 @@ async def list_favorites(
         .order_by(UserFavorite.added_at.desc())
         .all()
     )
-    
+
     enriched_favorites = []
     for fav in favorites:
-        anime_info = get_anime_info(fav.anime_id)
+        anime_info = app_state.get_anime_info(fav.anime_id)
         enriched_favorites.append(
             FavoriteResponse(
                 id=fav.id,
@@ -46,7 +52,7 @@ async def list_favorites(
                 image_url=anime_info.get("image_url"),
             )
         )
-    
+
     return FavoriteListResponse(
         favorites=enriched_favorites,
         total=len(enriched_favorites)
@@ -57,7 +63,8 @@ async def list_favorites(
 async def add_favorite(
     favorite_data: FavoriteCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    app_state: AppState = Depends(get_app_state)
 ):
     """Add an anime to the user's favorites."""
     existing = (
@@ -68,26 +75,26 @@ async def add_favorite(
         )
         .first()
     )
-    
+
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Anime already in favorites"
         )
-    
+
     new_favorite = UserFavorite(
         user_id=current_user.id,
         anime_id=favorite_data.anime_id
     )
-    
+
     db.add(new_favorite)
     db.commit()
     db.refresh(new_favorite)
-    
+
     logger.info(f"User {current_user.id} added anime {favorite_data.anime_id} to favorites")
-    
-    anime_info = get_anime_info(new_favorite.anime_id)
-    
+
+    anime_info = app_state.get_anime_info(new_favorite.anime_id)
+
     return FavoriteResponse(
         id=new_favorite.id,
         anime_id=new_favorite.anime_id,
@@ -113,19 +120,19 @@ async def remove_favorite(
         )
         .first()
     )
-    
+
     if not favorite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Favorite not found"
         )
-    
+
     anime_id = favorite.anime_id
     db.delete(favorite)
     db.commit()
-    
+
     logger.info(f"User {current_user.id} removed anime {anime_id} from favorites")
-    
+
     return MessageResponse(message="Favorite removed successfully")
 
 
@@ -144,18 +151,18 @@ async def remove_favorite_by_anime(
         )
         .first()
     )
-    
+
     if not favorite:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Anime not in favorites"
         )
-    
+
     db.delete(favorite)
     db.commit()
-    
+
     logger.info(f"User {current_user.id} removed anime {anime_id} from favorites")
-    
+
     return MessageResponse(message="Favorite removed successfully")
 
 

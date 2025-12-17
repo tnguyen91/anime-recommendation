@@ -167,6 +167,6 @@ Automated via GitHub Actions on push to `master`.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+[MIT LICENSE](LICENSE)
 
 Dataset attribution: [ATTRIBUTION.md](ATTRIBUTION.md)
