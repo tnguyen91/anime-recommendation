@@ -23,9 +23,3 @@ class Token(BaseModel):
     """Schema for JWT token response after successful login."""
     access_token: str
     token_type: str = "bearer"
-
-
-class TokenData(BaseModel):
-    """Schema for data extracted from a decoded JWT token."""
-    user_id: int | None = None
-    email: str | None = None
