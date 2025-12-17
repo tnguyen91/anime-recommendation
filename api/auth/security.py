@@ -1,16 +1,7 @@
 """
 Security utilities for password hashing and JWT token management.
 
-Password Security:
-    - Passwords are hashed with bcrypt (one-way, salted, slow by design)
-    - Never store or log plain passwords
-
-JWT (JSON Web Tokens):
-    - Stateless authentication - no server-side sessions needed
-    - Token contains user ID and expiration time
-    - Signed with SECRET_KEY to prevent tampering
-
-Configuration is loaded from centralized settings (see settings.py).
+Provides bcrypt password hashing and JWT token creation/validation.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional

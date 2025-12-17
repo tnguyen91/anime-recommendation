@@ -1,3 +1,4 @@
+"""RBM training and interactive recommendation CLI."""
 import os
 import argparse
 import random as _random

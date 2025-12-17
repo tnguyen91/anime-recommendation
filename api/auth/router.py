@@ -1,15 +1,4 @@
-"""
-Authentication API endpoints.
-
-Provides user registration, login, and profile retrieval.
-All passwords are hashed with bcrypt before storage.
-Authentication uses JWT tokens in the Authorization header.
-
-Endpoints:
-    POST /auth/register - Create new user account
-    POST /auth/login    - Authenticate and get JWT token
-    GET  /auth/me       - Get current user's profile
-"""
+"""Authentication API endpoints for registration, login, and profile retrieval."""
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -32,13 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
-    """
-    Register a new user account.
-    
-    - **email**: Valid email address (must be unique)
-    - **password**: At least 8 characters
-    - **username**: Optional display name (3-50 characters)
-    """
+    """Register a new user account."""
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
@@ -78,12 +61,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    """
-    Authenticate user and return JWT token.
-    
-    Use the returned token in the Authorization header:
-    `Authorization: Bearer <token>`
-    """
+    """Authenticate user and return JWT token."""
     user = db.query(User).filter(User.email == form_data.username).first()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -109,9 +87,5 @@ async def login(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """
-    Get information about the currently authenticated user.
-    
-    Requires valid JWT token in Authorization header.
-    """
+    """Get current user profile."""
     return current_user

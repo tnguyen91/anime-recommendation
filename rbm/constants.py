@@ -1,3 +1,4 @@
+"""Training configuration constants and paths."""
 import os
 from typing import Dict, List
 
