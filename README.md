@@ -92,14 +92,17 @@ uvicorn api.main:app --reload
 ```
 
 ### Environment Variables
-```env
-DATABASE_URL=postgresql://...
-JWT_SECRET_KEY=your-secret-key
-MODEL_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v2.0/rbm_best_model.pth
-METADATA_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/anime_metadata.json
-ANIME_CSV_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/Anime.csv
-USER_REVIEW_CSV_URI=https://github.com/tnguyen91/anime-recommendation/releases/download/v1.1/User-AnimeReview.csv
+
+Copy `.env.example` to `.env` and configure:
+
+```bash
+cp .env.example .env
 ```
+
+Key variables:
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET_KEY` - Secret for JWT signing (min 16 chars)
+- `MODEL_URI`, `METADATA_URI`, `ANIME_CSV_URI`, `USER_REVIEW_CSV_URI` - Data/model URLs
 
 ## Model Training
 

@@ -83,7 +83,7 @@ function debounce(fn, ms){
   }
 }
 
-function timeoutFetch(resource, options={}, ms=15000){
+function timeoutFetch(resource, options={}, ms=60000){
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), ms);
