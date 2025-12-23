@@ -217,7 +217,7 @@ async def recommend(
     body: RecommendRequest,
     app_state: AppState = Depends(get_app_state)
 ):
-    """Get personalized anime recommendations based on liked titles."""
+    """Get personalized anime recommendations based on liked anime."""
     if not body.liked_anime:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="liked_anime must be a non-empty list")
 
