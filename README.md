@@ -16,13 +16,14 @@ A personalized anime recommendation engine using Restricted Boltzmann Machines (
 - Search across 12,000+ anime
 - User authentication with JWT
 - Rate-limited API endpoints
-- Google Analytics integration
+- ML monitoring with drift detection
+- MLflow experiment tracking
 
 ## Model Performance
 
 | Metric | Value |
 |--------|-------|
-| MAP@10 | 0.4169 |
+| MAP@10 | 0.4231 |
 | Precision@10 | 0.1787 |
 | NDCG@10 | 0.2531 |
 
@@ -33,8 +34,9 @@ Trained on 5,859 users × 12,347 anime (~1.3M interactions)
 - **Backend:** Python 3.12, FastAPI, PyTorch, SQLAlchemy
 - **Frontend:** Vanilla JS, CSS
 - **Database:** PostgreSQL (Neon)
+- **ML Tracking:** MLflow
+- **Monitoring:** Streamlit dashboard, drift detection
 - **Deployment:** Docker, Google Cloud Run, GitHub Actions
-- **Auth:** JWT + bcrypt
 
 ## Quickstart
 
@@ -54,8 +56,17 @@ anime-recommendation/
 │   ├── auth/               # Authentication (JWT)
 │   ├── favorites/          # User favorites CRUD
 │   ├── inference/          # RBM model & recommendations
+│   ├── monitoring.py       # Prediction logging
 │   ├── alembic/            # Database migrations
 │   └── tests/
+├── monitoring/             # ML monitoring tools
+│   ├── analyze_predictions.py
+│   ├── drift_detection.py
+│   └── dashboard.py        # Streamlit UI
+├── data_pipeline/          # Data collection & processing
+│   ├── collectors/         # Jikan API, app data export
+│   ├── processors/         # Data unification, training prep
+│   └── validators/         # Quality checks
 ├── rbm/                    # Model training
 │   ├── src/                # Training code
 │   ├── config.yaml         # Hyperparameters
@@ -104,6 +115,45 @@ Key variables:
 - `JWT_SECRET_KEY` - Secret for JWT signing (min 16 chars)
 - `MODEL_URI`, `METADATA_URI`, `ANIME_CSV_URI`, `USER_REVIEW_CSV_URI` - Data/model URLs
 
+## ML Monitoring
+
+Predictions are logged to `logs/predictions.jsonl` with latency, inputs, and outputs.
+
+### Analyze Predictions
+```bash
+python -m monitoring.analyze_predictions
+```
+
+### Detect Drift
+```bash
+python -m monitoring.drift_detection
+```
+
+### Dashboard
+```bash
+streamlit run monitoring/dashboard.py
+```
+Opens at http://localhost:8501
+
+### Generate Test Data
+```bash
+python -m monitoring.generate_test_data
+```
+
+## Data Pipeline
+
+Collect and process data from multiple sources:
+
+```bash
+# Full pipeline
+python -m data_pipeline.run_pipeline full
+
+# Individual steps
+python -m data_pipeline.run_pipeline collect-anime
+python -m data_pipeline.run_pipeline unify
+python -m data_pipeline.run_pipeline validate
+```
+
 ## Model Training
 
 ### Train with Best Config
@@ -116,18 +166,19 @@ python -m rbm.main --train --no-cli
 python -m rbm.hyperparameter_tuning
 ```
 
-Supports resume - if interrupted, re-run and it will skip completed configs.
+### View MLflow Experiments
+```bash
+mlflow ui
+```
+Opens at http://localhost:5000
 
 ### Current Best Configuration
 ```yaml
 model:
   n_hidden: 1024
-  learning_rate: 0.001
-  batch_size: 64
+  learning_rate: 0.0005
+  batch_size: 32
   epochs: 50
-data:
-  min_likes_user: 50
-  min_likes_anime: 50
 ```
 
 ## Dataset
@@ -151,8 +202,6 @@ Preprocessing:
 ```bash
 pytest api/tests/ -v
 ```
-
-37 tests covering auth, recommendations, favorites, and validation.
 
 ## Deployment
 
