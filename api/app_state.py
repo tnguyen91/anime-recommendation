@@ -1,9 +1,4 @@
-"""
-Application runtime state container.
-
-Encapsulates ML model, datasets, and metadata in a type-safe dataclass.
-Accessed via FastAPI dependency injection for clean endpoint signatures.
-"""
+"""Application runtime state container for ML model and datasets."""
 from __future__ import annotations
 
 import json

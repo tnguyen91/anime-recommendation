@@ -1,3 +1,4 @@
+"""Tests for API endpoints."""
 import os
 import sys
 from unittest.mock import MagicMock, patch

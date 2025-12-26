@@ -1,9 +1,4 @@
-"""
-Database configuration and session management.
-
-Configures SQLAlchemy engine with connection pooling for PostgreSQL.
-Provides FastAPI dependency for database session injection.
-"""
+"""Database configuration and session management for PostgreSQL."""
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 

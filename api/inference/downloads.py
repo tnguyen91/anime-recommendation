@@ -1,9 +1,4 @@
-"""
-File download utilities with caching and retry support.
-
-Provides robust file downloading with automatic retries, checksum validation,
-and local caching to avoid redundant downloads.
-"""
+"""File download utilities with caching and retry support."""
 from __future__ import annotations
 
 import hashlib

@@ -1,9 +1,4 @@
-"""
-Centralized application settings with Pydantic validation.
-
-Loads configuration from environment variables with type coercion and validation.
-Required settings are validated at startup to ensure fast failure.
-"""
+"""Centralized application settings with Pydantic validation."""
 from __future__ import annotations
 
 from functools import lru_cache

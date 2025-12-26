@@ -1,8 +1,4 @@
-"""
-Security utilities for password hashing and JWT token management.
-
-Provides bcrypt password hashing and JWT token creation/validation.
-"""
+"""Security utilities for password hashing and JWT token management."""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 

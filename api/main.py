@@ -1,9 +1,4 @@
-"""
-Anime Recommendation API.
-
-FastAPI application serving ML-powered anime recommendations using a
-Restricted Boltzmann Machine trained on MyAnimeList user ratings.
-"""
+"""Anime Recommendation API powered by RBM-based collaborative filtering."""
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -28,6 +23,7 @@ from api.inference.recommender import get_recommendations
 from api.auth.router import router as auth_router
 from api.favorites.router import router as favorites_router
 from api.settings import settings
+from api.monitoring import get_prediction_logger
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level),
@@ -39,8 +35,6 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
 
-
-# --- Request/Response Schemas ---
 
 class RecommendRequest(BaseModel):
     """Recommendation request parameters."""
@@ -73,8 +67,6 @@ class SearchResponse(BaseModel):
     offset: int
 
 
-# --- Helper Functions ---
-
 def _safe_str(value) -> str:
     """Convert value to string, returning empty string for null/NaN."""
     return "" if pd.isnull(value) else str(value)
@@ -104,14 +96,10 @@ def _build_anime_result(row: pd.Series, app_state: AppState) -> AnimeResult:
     )
 
 
-# --- Dependencies ---
-
 def get_app_state(request: Request) -> AppState:
     """Dependency injection for application state."""
     return request.app.state.app_state
 
-
-# --- Application Lifecycle ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -163,8 +151,6 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down")
 
 
-# --- Application Setup ---
-
 app = FastAPI(
     title="Anime Recommendation API",
     version="1.0.0",
@@ -196,8 +182,6 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-# --- Endpoints ---
-
 @app.get("/")
 async def root():
     """Root endpoint redirects to health check."""
@@ -218,6 +202,7 @@ async def recommend(
     app_state: AppState = Depends(get_app_state)
 ):
     """Get personalized anime recommendations based on liked anime."""
+    # ========== INPUT VALIDATION ==========
     if not body.liked_anime:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="liked_anime must be a non-empty list")
 
@@ -227,6 +212,12 @@ async def recommend(
     matched_ids = app_state.anime_df[app_state.anime_df["name"].isin(body.liked_anime)]["anime_id"].tolist()
     if not matched_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No matching anime found")
+
+    # ========== MONITORING: Start timing ==========
+    # We measure how long the prediction takes (latency)
+    # High latency = bad user experience
+    prediction_start = time.time()
+    pred_logger = get_prediction_logger()
 
     try:
         top_n = min(body.top_n, 50)
@@ -245,10 +236,36 @@ async def recommend(
         )
         logger.info(f"Got {len(recs)} recommendations")
 
+        # Extract output anime IDs for logging
+        output_anime_ids = recs["anime_id"].tolist() if not recs.empty else []
+
+        # ========== MONITORING: Log successful prediction ==========
+        latency_ms = (time.time() - prediction_start) * 1000
+        log_entry = pred_logger.create_log_entry(
+            input_anime_ids=matched_ids,
+            output_anime_ids=output_anime_ids,
+            latency_ms=latency_ms,
+            user_id=None,  # TODO: Extract from JWT if authenticated
+            success=True
+        )
+        pred_logger.log(log_entry)
+
         recommendations = [_build_anime_result(row, app_state) for _, row in recs.iterrows()]
         return RecommendResponse(recommendations=recommendations)
 
-    except Exception:
+    except Exception as e:
+        # ========== MONITORING: Log failed prediction ==========
+        latency_ms = (time.time() - prediction_start) * 1000
+        log_entry = pred_logger.create_log_entry(
+            input_anime_ids=matched_ids,
+            output_anime_ids=[],
+            latency_ms=latency_ms,
+            user_id=None,
+            success=False,
+            error_message=str(e)
+        )
+        pred_logger.log(log_entry)
+
         logger.exception(f"Error generating recommendations for: {body.liked_anime}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error while generating recommendations")
 
@@ -310,8 +327,6 @@ async def search_anime(
         logger.exception(f"Error searching anime with query: {query}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error while searching anime")
 
-
-# --- Router Registration ---
 
 v1_router.include_router(auth_router)
 v1_router.include_router(favorites_router)
