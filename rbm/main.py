@@ -5,6 +5,7 @@ import random as _random
 import numpy as np
 import torch
 import yaml
+import mlflow
 
 try:
     from rbm.constants import SEED, DEFAULT_TOP_N, CONFIG_FILE, OUTPUT_DIR
@@ -24,6 +25,10 @@ except Exception:
         preprocess_data, make_train_test_split, plot_training_metrics,
         interactive_recommender
     )
+
+MLFLOW_EXPERIMENT_NAME = "anime-rbm-training"
+_mlruns_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mlruns"))
+MLFLOW_TRACKING_URI = f"file:///{_mlruns_path.replace(os.sep, '/')}"
 
 def load_config():
     """Load YAML configuration file."""
@@ -72,19 +77,43 @@ def prepare_train_test_data(user_anime):
 
 
 def train_workflow(rbm, train_tensor, test_tensor, train_df, test_arr, user_anime, anime, device, **kwargs):
-    """Execute training loop and plot metrics."""
+    """Execute training loop with MLflow tracking and save metrics plot."""
     print(f"Training RBM with n_hidden={kwargs['n_hidden']}, learning_rate={kwargs['learning_rate']}, "
           f"batch_size={kwargs['batch_size']}, epochs={kwargs['epochs']}, k={kwargs['k']} on {device}")
 
-    rbm, losses, precs, maps, ndcgs = train_rbm(
-        rbm, train_tensor, test_tensor,
-        epochs=kwargs['epochs'],
-        batch_size=kwargs['batch_size'],
-        learning_rate=kwargs['learning_rate'],
-        k=kwargs['k'],
-        device=device
-    )
-    plot_training_metrics(losses, precs, maps, ndcgs, kwargs['k'])
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    run_name = f"rbm_h{kwargs['n_hidden']}_lr{kwargs['learning_rate']}_bs{kwargs['batch_size']}"
+
+    with mlflow.start_run(run_name=run_name):
+        print(f"MLflow experiment: {MLFLOW_EXPERIMENT_NAME}")
+        print(f"MLflow run name: {run_name}")
+
+        mlflow.log_params({
+            "min_likes_user": data_cfg["min_likes_user"],
+            "min_likes_anime": data_cfg["min_likes_anime"],
+            "holdout_ratio": data_cfg["holdout_ratio"],
+            "seed": SEED
+        })
+
+        rbm, losses, precs, maps, ndcgs = train_rbm(
+            rbm, train_tensor, test_tensor,
+            epochs=kwargs['epochs'],
+            batch_size=kwargs['batch_size'],
+            learning_rate=kwargs['learning_rate'],
+            k=kwargs['k'],
+            device=device,
+            use_mlflow=True
+        )
+
+        plot_path = plot_training_metrics(losses, precs, maps, ndcgs, kwargs['k'])
+        if plot_path and os.path.exists(plot_path):
+            mlflow.log_artifact(plot_path, artifact_path="plots")
+
+        print("=" * 60)
+        print("Training complete. View results with: mlflow ui")
+        print("=" * 60)
+
     return rbm
 
 

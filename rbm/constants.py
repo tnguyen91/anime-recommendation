@@ -35,8 +35,8 @@ SEED = 1234
 DEFAULT_TOP_N = 10
 
 HYPERPARAMETER_GRID: Dict[str, List] = {
-    "n_hidden": [256, 512, 1024],
-    "learning_rate": [0.005, 0.001],
-    "batch_size": [16, 32, 64],
+    "n_hidden": [2048],
+    "learning_rate": [0.001, 0.0005],
+    "batch_size": [32],
 }
 HYPERPARAMETER_EPOCHS = 50

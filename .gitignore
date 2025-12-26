@@ -74,6 +74,13 @@ rbm/out/
 cache/
 
 # =============================================================================
+# MLflow Experiment Tracking
+# =============================================================================
+# MLflow stores experiment data, metrics, and artifacts here
+mlruns/
+mlartifacts/
+
+# =============================================================================
 # Project-Specific: Frontend
 # =============================================================================
 anime-recommendation-ui/node_modules/

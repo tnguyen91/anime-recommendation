@@ -145,7 +145,7 @@ def make_input_vector(liked_anime_ids, anime_ids):
     return [1 if anime_id in liked_anime_ids else 0 for anime_id in anime_ids]
 
 def plot_training_metrics(losses, precs, maps, ndcgs, K):
-    """Plot and save training metrics over epochs."""
+    """Plot and save training metrics over epochs, returning the output path."""
     plt.figure(figsize=DEFAULT_FIGURE_SIZE)
     plt.plot(losses, label="Loss")
     plt.plot(precs, label=f"Precision@{K}")
@@ -160,6 +160,7 @@ def plot_training_metrics(losses, precs, maps, ndcgs, K):
     os.makedirs(os.path.dirname(output_path) or OUTPUT_DIR, exist_ok=True)
     plt.savefig(output_path)
     plt.show()
+    return output_path
 
 def collect_user_preferences(anime_df):
     """Interactive CLI to collect user's liked anime."""
