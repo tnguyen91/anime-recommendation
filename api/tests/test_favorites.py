@@ -1,6 +1,7 @@
 """Tests for favorites endpoints."""
 import os
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -67,11 +68,15 @@ def client():
         
         mock_load_data.return_value = (mock_ratings, mock_anime_df)
         mock_filter.return_value = ([1, 2, 3], mock_ratings)
-        
+
+        mock_path = MagicMock(spec=Path)
+        mock_path.exists.return_value = False
+        mock_download.return_value = mock_path
+
         rbm_instance = MagicMock()
         rbm_instance.to.return_value = rbm_instance
         mock_rbm.return_value = rbm_instance
-        
+
         with TestClient(app) as test_client:
             yield test_client
     
