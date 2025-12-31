@@ -1,0 +1,163 @@
+name: Model Retraining
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      refresh_data:
+        description: 'Refresh data from app database'
+        required: false
+        type: boolean
+        default: false
+      force_promote:
+        description: 'Force promote new model regardless of performance'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run (train and compare, but do not save)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-retrain-${{ hashFiles('api/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-retrain-
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api/requirements.txt
+          pip install dvc mlflow matplotlib
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ vars.GCP_PROJECT }}
+
+      - name: Download current model from GCS
+        run: |
+          mkdir -p out
+          gsutil cp "${{ vars.MODEL_URI }}" out/rbm_best_model.pth || echo "No existing model found"
+
+      - name: Download training data from GCS
+        run: |
+          mkdir -p cache
+          gsutil cp "${{ vars.ANIME_CSV_URI }}" cache/Anime.csv || true
+          gsutil cp "${{ vars.USER_REVIEW_CSV_URI }}" cache/User-AnimeReview.csv || true
+
+      - name: Prepare retrain arguments
+        id: args
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.refresh_data }}" == "true" ]; then
+            ARGS="$ARGS --refresh-data"
+          fi
+          if [ "${{ github.event.inputs.force_promote }}" == "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "args=$ARGS" >> $GITHUB_OUTPUT
+
+      - name: Run model retraining
+        id: retrain
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -m rbm.retrain ${{ steps.args.outputs.args }} 2>&1 | tee retrain_output.txt
+
+          if [ $? -eq 0 ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          if [ -f out/retrain_metrics.json ]; then
+            PROMOTED=$(python -c "import json; print(json.load(open('out/retrain_metrics.json'))['promoted'])")
+            IMPROVEMENT=$(python -c "import json; print(json.load(open('out/retrain_metrics.json'))['improvement'])")
+            NEW_MAP=$(python -c "import json; m=json.load(open('out/retrain_metrics.json'))['new_model']; print(m.get('map@10', 0))")
+            echo "promoted=$PROMOTED" >> $GITHUB_OUTPUT
+            echo "improvement=$IMPROVEMENT" >> $GITHUB_OUTPUT
+            echo "new_map=$NEW_MAP" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload new model to GCS
+        if: steps.retrain.outputs.promoted == 'True' && github.event.inputs.dry_run != 'true'
+        run: |
+          TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S")
+          VERSION_PATH="gs://${{ vars.GCP_PROJECT }}-ml-models/anime-recommendation/models/rbm_model_${TIMESTAMP}.pth"
+          LATEST_PATH="gs://${{ vars.GCP_PROJECT }}-ml-models/anime-recommendation/models/rbm_best_model.pth"
+          gsutil cp out/rbm_best_model.pth "$VERSION_PATH"
+          gsutil cp out/rbm_best_model.pth "$LATEST_PATH"
+          gsutil cp out/retrain_metrics.json "gs://${{ vars.GCP_PROJECT }}-ml-models/anime-recommendation/metrics/retrain_metrics_${TIMESTAMP}.json"
+
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-artifacts-${{ github.run_number }}
+          path: |
+            out/retrain_metrics.json
+            out/training_metrics.png
+            retrain_output.txt
+          retention-days: 30
+
+      - name: Create job summary
+        run: |
+          echo "## Model Retraining Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.retrain.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f out/retrain_metrics.json ]; then
+            echo "### Metrics" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Model Promoted | ${{ steps.retrain.outputs.promoted }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Improvement | ${{ steps.retrain.outputs.improvement }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| New MAP@10 | ${{ steps.retrain.outputs.new_map }} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Option | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Refresh Data | ${{ github.event.inputs.refresh_data || 'false' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Force Promote | ${{ github.event.inputs.force_promote || 'false' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Dry Run | ${{ github.event.inputs.dry_run || 'false' }} |" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -76,7 +76,9 @@ anime-recommendation/
 │   └── validators/         # Quality checks
 ├── rbm/                    # Model training
 │   ├── src/                # Training code
+│   ├── tests/              # Training tests
 │   ├── config.yaml         # Hyperparameters
+│   ├── retrain.py          # Automated retraining
 │   └── hyperparameter_tuning.py
 ├── anime-recommendation-ui/ # Frontend
 └── .github/workflows/      # CI/CD
@@ -186,6 +188,58 @@ model:
   learning_rate: 0.0005
   batch_size: 32
   epochs: 50
+```
+
+## Automated Retraining
+
+The model can be automatically retrained with new data using the retraining pipeline.
+
+### Manual Retraining
+```bash
+# Train and compare against current model
+python -m rbm.retrain
+
+# Refresh data from app database first
+python -m rbm.retrain --refresh-data
+
+# Force promote new model regardless of performance
+python -m rbm.retrain --force
+
+# Dry run (train and compare, but don't save)
+python -m rbm.retrain --dry-run
+```
+
+### How It Works
+
+1. **Data Refresh** (optional): Pulls latest user favorites from production database
+2. **Training**: Trains a new RBM model with current configuration
+3. **Comparison**: Evaluates new model against current production model
+4. **Promotion**: Only promotes new model if it improves MAP@10 by ≥5%
+5. **Logging**: All runs tracked in MLflow with full metrics
+
+### Scheduled Retraining (GitHub Actions)
+
+Retraining runs automatically on the 1st of each month via GitHub Actions. You can also trigger it manually:
+
+1. Go to **Actions** → **Model Retraining**
+2. Click **Run workflow**
+3. Configure options:
+   - `refresh_data`: Pull latest user data
+   - `force_promote`: Skip performance check
+   - `dry_run`: Test without saving
+
+### Retraining Metrics
+
+After retraining, metrics are saved to `out/retrain_metrics.json`:
+
+```json
+{
+  "timestamp": "2024-01-01T00:00:00Z",
+  "current_model": {"map@10": 0.42, "precision@10": 0.18},
+  "new_model": {"map@10": 0.44, "precision@10": 0.19},
+  "promoted": true,
+  "improvement": 0.048
+}
 ```
 
 ## Data Version Control (DVC)
