@@ -35,6 +35,7 @@ Trained on 5,859 users × 12,347 anime (~1.3M interactions)
 - **Frontend:** Vanilla JS, CSS
 - **Database:** PostgreSQL (Neon)
 - **ML Tracking:** MLflow
+- **Data Versioning:** DVC (Data Version Control)
 - **Monitoring:** Streamlit dashboard, drift detection
 - **Deployment:** Docker, Google Cloud Run, GitHub Actions
 
@@ -52,6 +53,12 @@ docker-compose up --build
 
 ```
 anime-recommendation/
+├── .dvc/                   # DVC configuration
+├── cache/                  # Data files (DVC tracked)
+│   ├── Anime.csv.dvc       # Anime dataset pointer
+│   └── User-AnimeReview.csv.dvc
+├── out/                    # Model outputs (DVC tracked)
+│   └── rbm_best_model.pth.dvc
 ├── api/                    # FastAPI backend
 │   ├── auth/               # Authentication (JWT)
 │   ├── favorites/          # User favorites CRUD
@@ -180,6 +187,32 @@ model:
   batch_size: 32
   epochs: 50
 ```
+
+## Data Version Control (DVC)
+
+Large files (datasets, models) are tracked with DVC. Git stores small pointer files (`.dvc`), while actual data lives in remote storage.
+
+### Pull Data
+```bash
+pip install dvc
+dvc pull
+```
+
+### After Updating Data/Model
+```bash
+dvc add cache/Anime.csv out/rbm_best_model.pth
+dvc push
+git add cache/Anime.csv.dvc out/rbm_best_model.pth.dvc
+git commit -m "Update data"
+```
+
+### Tracked Files
+| File | Size | Description |
+|------|------|-------------|
+| `cache/Anime.csv` | 12 MB | Anime metadata |
+| `cache/User-AnimeReview.csv` | 100+ MB | User ratings |
+| `cache/anime_metadata.json` | ~5 MB | Extended anime info |
+| `out/rbm_best_model.pth` | ~50 MB | Trained model |
 
 ## Dataset
 
