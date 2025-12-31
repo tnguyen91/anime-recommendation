@@ -51,10 +51,16 @@ Thumbs.db
 datasets/
 data/
 *.pth
-out/
-!out/training_metrics.png
 rbm/out/
-cache/
+
+# DVC tracked directories
+cache/*
+!cache/*.dvc
+!cache/.gitignore
+out/*
+!out/*.dvc
+!out/.gitignore
+!out/training_metrics.png
 
 # MLflow
 mlruns/

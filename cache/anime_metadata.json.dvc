@@ -1,0 +1,5 @@
+outs:
+- md5: 4078f4c06b333881a4f67e162e499d18
+  size: 12637829
+  hash: md5
+  path: anime_metadata.json

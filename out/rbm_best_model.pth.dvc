@@ -1,0 +1,5 @@
+outs:
+- md5: ec0fefb9d2324caf57dfa27d19157e06
+  size: 50628613
+  hash: md5
+  path: rbm_best_model.pth
