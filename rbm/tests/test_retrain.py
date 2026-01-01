@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import numpy as np
 import pytest
@@ -16,10 +16,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from rbm.src.model import RBM
 from rbm.retrain import (
     IMPROVEMENT_THRESHOLD,
+    MODEL_REGISTRY_NAME,
+    STAGE_PRODUCTION,
+    STAGE_STAGING,
+    STAGE_ARCHIVED,
     compare_models,
     evaluate_model,
     save_metrics,
     set_seed,
+    get_mlflow_client,
+    register_model,
+    get_production_model_version,
+    get_model_versions_by_stage,
+    transition_model_stage,
+    promote_model_version,
+    get_registry_model_uri,
 )
 
 
@@ -252,3 +263,172 @@ class TestRetrainIntegration:
             metrics_path = os.path.join(tmpdir, 'metrics.json')
             assert not os.path.exists(model_path)
             assert not os.path.exists(metrics_path)
+
+
+class TestModelRegistryConstants:
+    """Tests for Model Registry constants."""
+
+    def test_model_registry_name(self):
+        """Model registry name is set."""
+        assert MODEL_REGISTRY_NAME == "anime-rbm"
+
+    def test_stage_constants(self):
+        """Stage constants are set correctly."""
+        assert STAGE_PRODUCTION == "Production"
+        assert STAGE_STAGING == "Staging"
+        assert STAGE_ARCHIVED == "Archived"
+
+
+class TestGetRegistryModelUri:
+    """Tests for get_registry_model_uri function."""
+
+    def test_default_uri(self):
+        """Default URI uses Production stage."""
+        uri = get_registry_model_uri()
+        assert uri == f"models:/{MODEL_REGISTRY_NAME}/Production"
+
+    def test_staging_uri(self):
+        """Can get Staging stage URI."""
+        uri = get_registry_model_uri(stage=STAGE_STAGING)
+        assert uri == f"models:/{MODEL_REGISTRY_NAME}/Staging"
+
+    def test_custom_model_name(self):
+        """Can use custom model name."""
+        uri = get_registry_model_uri(model_name="custom-model")
+        assert uri == "models:/custom-model/Production"
+
+
+class TestGetMlflowClient:
+    """Tests for get_mlflow_client function."""
+
+    def test_returns_client(self):
+        """get_mlflow_client returns MlflowClient instance."""
+        from mlflow.tracking import MlflowClient
+        client = get_mlflow_client()
+        assert isinstance(client, MlflowClient)
+
+
+class TestRegisterModel:
+    """Tests for register_model function."""
+
+    def test_register_model_success(self):
+        """register_model returns version on success."""
+        mock_result = MagicMock()
+        mock_result.version = "1"
+
+        with patch('rbm.retrain.mlflow.register_model', return_value=mock_result):
+            version = register_model("test-run-id")
+            assert version == "1"
+
+    def test_register_model_failure(self):
+        """register_model returns None on failure."""
+        from mlflow.exceptions import MlflowException
+
+        with patch('rbm.retrain.mlflow.register_model', side_effect=MlflowException("error")):
+            version = register_model("test-run-id")
+            assert version is None
+
+
+class TestGetProductionModelVersion:
+    """Tests for get_production_model_version function."""
+
+    def test_returns_version_when_exists(self):
+        """Returns version when production model exists."""
+        mock_version = MagicMock()
+        mock_version.version = "3"
+
+        with patch('rbm.retrain.get_mlflow_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.get_latest_versions.return_value = [mock_version]
+            mock_get_client.return_value = mock_client
+
+            version = get_production_model_version()
+            assert version == "3"
+
+    def test_returns_none_when_not_exists(self):
+        """Returns None when no production model exists."""
+        with patch('rbm.retrain.get_mlflow_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.get_latest_versions.return_value = []
+            mock_get_client.return_value = mock_client
+
+            version = get_production_model_version()
+            assert version is None
+
+
+class TestTransitionModelStage:
+    """Tests for transition_model_stage function."""
+
+    def test_transition_success(self):
+        """transition_model_stage returns True on success."""
+        with patch('rbm.retrain.get_mlflow_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = transition_model_stage("1", STAGE_PRODUCTION)
+            assert result is True
+            mock_client.transition_model_version_stage.assert_called_once()
+
+    def test_transition_failure(self):
+        """transition_model_stage returns False on failure."""
+        from mlflow.exceptions import MlflowException
+
+        with patch('rbm.retrain.get_mlflow_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.transition_model_version_stage.side_effect = MlflowException("error")
+            mock_get_client.return_value = mock_client
+
+            result = transition_model_stage("1", STAGE_PRODUCTION)
+            assert result is False
+
+
+class TestPromoteModelVersion:
+    """Tests for promote_model_version function."""
+
+    def test_promote_archives_existing(self):
+        """promote_model_version archives existing production."""
+        with patch('rbm.retrain.get_production_model_version', return_value="2"):
+            with patch('rbm.retrain.transition_model_stage', return_value=True) as mock_transition:
+                result = promote_model_version("3")
+                assert result is True
+                mock_transition.assert_called_once_with(
+                    version="3",
+                    stage=STAGE_PRODUCTION,
+                    model_name=MODEL_REGISTRY_NAME,
+                    archive_existing=True
+                )
+
+    def test_promote_when_no_existing(self):
+        """promote_model_version works when no existing production."""
+        with patch('rbm.retrain.get_production_model_version', return_value=None):
+            with patch('rbm.retrain.transition_model_stage', return_value=True):
+                result = promote_model_version("1")
+                assert result is True
+
+
+class TestGetModelVersionsByStage:
+    """Tests for get_model_versions_by_stage function."""
+
+    def test_returns_versions(self):
+        """get_model_versions_by_stage returns list of versions."""
+        mock_versions = [MagicMock(), MagicMock()]
+
+        with patch('rbm.retrain.get_mlflow_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.get_latest_versions.return_value = mock_versions
+            mock_get_client.return_value = mock_client
+
+            versions = get_model_versions_by_stage(stage=STAGE_STAGING)
+            assert len(versions) == 2
+
+    def test_returns_empty_on_error(self):
+        """get_model_versions_by_stage returns empty list on error."""
+        from mlflow.exceptions import MlflowException
+
+        with patch('rbm.retrain.get_mlflow_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.get_latest_versions.side_effect = MlflowException("error")
+            mock_get_client.return_value = mock_client
+
+            versions = get_model_versions_by_stage()
+            assert versions == []

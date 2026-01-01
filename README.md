@@ -213,9 +213,11 @@ python -m rbm.retrain --dry-run
 
 1. **Data Refresh** (optional): Pulls latest user favorites from production database
 2. **Training**: Trains a new RBM model with current configuration
-3. **Comparison**: Evaluates new model against current production model
-4. **Promotion**: Only promotes new model if it improves MAP@10 by ≥5%
-5. **Logging**: All runs tracked in MLflow with full metrics
+3. **Registration**: Model is registered in MLflow Model Registry
+4. **Comparison**: Evaluates new model against current production model
+5. **Promotion**: Only promotes new model if it improves MAP@10 by ≥5%
+6. **Stage Transition**: Promoted models move to Production stage, previous versions archived
+7. **Logging**: All runs tracked in MLflow with full metrics
 
 ### Scheduled Retraining (GitHub Actions)
 
@@ -240,6 +242,31 @@ After retraining, metrics are saved to `out/retrain_metrics.json`:
   "promoted": true,
   "improvement": 0.048
 }
+```
+
+### MLflow Model Registry
+
+Models are registered in MLflow Model Registry with version tracking and stage management:
+
+**Stages:**
+- **Staging**: New models awaiting validation
+- **Production**: Currently deployed model
+- **Archived**: Previous production models
+
+**Viewing the Registry:**
+```bash
+mlflow ui  # Open http://localhost:5000 and navigate to Models
+```
+
+**Programmatic Access:**
+```python
+from rbm.retrain import get_registry_model_uri, get_production_model_version
+
+# Get current production version
+version = get_production_model_version()  # Returns "3" etc.
+
+# Get model URI for loading
+uri = get_registry_model_uri()  # Returns "models:/anime-rbm/Production"
 ```
 
 ## Data Version Control (DVC)

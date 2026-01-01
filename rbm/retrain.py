@@ -11,6 +11,8 @@ from typing import Optional, Tuple, Dict, Any
 import numpy as np
 import torch
 import mlflow
+from mlflow.tracking import MlflowClient
+from mlflow.exceptions import MlflowException
 
 try:
     from rbm.constants import SEED, OUTPUT_DIR, CONFIG_FILE
@@ -37,6 +39,11 @@ IMPROVEMENT_THRESHOLD = 0.05
 MLFLOW_EXPERIMENT_NAME = "anime-rbm-retraining"
 _mlruns_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mlruns"))
 MLFLOW_TRACKING_URI = f"file:///{_mlruns_path.replace(os.sep, '/')}"
+
+MODEL_REGISTRY_NAME = "anime-rbm"
+STAGE_PRODUCTION = "Production"
+STAGE_STAGING = "Staging"
+STAGE_ARCHIVED = "Archived"
 
 CURRENT_MODEL_PATH = os.path.join(OUTPUT_DIR, "rbm_best_model.pth")
 CANDIDATE_MODEL_PATH = os.path.join(OUTPUT_DIR, "rbm_candidate_model.pth")
@@ -223,7 +230,7 @@ def save_metrics(
 
 
 def promote_model() -> None:
-    """Promote candidate model to production."""
+    """Promote candidate model to production (file-based fallback)."""
     if os.path.exists(CANDIDATE_MODEL_PATH):
         if os.path.exists(CURRENT_MODEL_PATH):
             backup_path = CURRENT_MODEL_PATH.replace('.pth', '_backup.pth')
@@ -234,6 +241,101 @@ def promote_model() -> None:
         print(f"Promoted candidate model to {CURRENT_MODEL_PATH}")
     else:
         print(f"Error: Candidate model not found at {CANDIDATE_MODEL_PATH}")
+
+
+def get_mlflow_client() -> MlflowClient:
+    """Get configured MLflow client."""
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    return MlflowClient()
+
+
+def register_model(run_id: str, model_name: str = MODEL_REGISTRY_NAME) -> Optional[str]:
+    """Register a model from an MLflow run to the Model Registry."""
+    model_uri = f"runs:/{run_id}/pytorch_model"
+
+    try:
+        result = mlflow.register_model(model_uri, model_name)
+        print(f"Registered model '{model_name}' version {result.version}")
+        return result.version
+    except MlflowException as e:
+        print(f"Error registering model: {e}")
+        return None
+
+
+def get_production_model_version(model_name: str = MODEL_REGISTRY_NAME) -> Optional[str]:
+    """Get the current production model version number."""
+    client = get_mlflow_client()
+
+    try:
+        versions = client.get_latest_versions(model_name, stages=[STAGE_PRODUCTION])
+        if versions:
+            return versions[0].version
+    except MlflowException:
+        pass
+
+    return None
+
+
+def get_model_versions_by_stage(
+    model_name: str = MODEL_REGISTRY_NAME,
+    stage: str = STAGE_PRODUCTION
+) -> list:
+    """Get all model versions in a specific stage."""
+    client = get_mlflow_client()
+
+    try:
+        return client.get_latest_versions(model_name, stages=[stage])
+    except MlflowException:
+        return []
+
+
+def transition_model_stage(
+    version: str,
+    stage: str,
+    model_name: str = MODEL_REGISTRY_NAME,
+    archive_existing: bool = True
+) -> bool:
+    """Transition a model version to a new stage."""
+    client = get_mlflow_client()
+
+    try:
+        client.transition_model_version_stage(
+            name=model_name,
+            version=version,
+            stage=stage,
+            archive_existing_versions=archive_existing
+        )
+        print(f"Transitioned model version {version} to '{stage}'")
+        return True
+    except MlflowException as e:
+        print(f"Error transitioning model: {e}")
+        return False
+
+
+def promote_model_version(
+    version: str,
+    model_name: str = MODEL_REGISTRY_NAME
+) -> bool:
+    """Promote a model version to Production, archiving the current production."""
+    current_prod = get_production_model_version(model_name)
+
+    if current_prod:
+        print(f"Archiving current production model (version {current_prod})")
+
+    return transition_model_stage(
+        version=version,
+        stage=STAGE_PRODUCTION,
+        model_name=model_name,
+        archive_existing=True
+    )
+
+
+def get_registry_model_uri(
+    stage: str = STAGE_PRODUCTION,
+    model_name: str = MODEL_REGISTRY_NAME
+) -> str:
+    """Get the model URI for loading from registry."""
+    return f"models:/{model_name}/{stage}"
 
 
 def retrain(
@@ -296,7 +398,9 @@ def retrain(
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     run_name = f"retrain_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    with mlflow.start_run(run_name=run_name):
+    run_id = None
+    with mlflow.start_run(run_name=run_name) as run:
+        run_id = run.info.run_id
         mlflow.log_params({
             'n_hidden': model_cfg['n_hidden'],
             'learning_rate': model_cfg['learning_rate'],
@@ -345,24 +449,33 @@ def retrain(
             for metric, value in current_metrics.items():
                 mlflow.log_metric(f'current_{metric}', value)
 
+        mlflow.pytorch.log_model(new_model, "pytorch_model")
+
+    promoted = False
+    model_version = None
+
     if dry_run:
-        print("[DRY RUN] Skipping model promotion and metric saving")
-        promoted = False
-    elif force_promote:
-        print("[FORCE] Promoting new model regardless of performance")
+        print("[DRY RUN] Skipping model registration and promotion")
+    elif run_id:
+        model_version = register_model(run_id)
+
+        if model_version:
+            if force_promote:
+                print("[FORCE] Promoting new model regardless of performance")
+                if promote_model_version(model_version):
+                    promoted = True
+            elif should_promote:
+                print("Promoting new model to Production...")
+                if promote_model_version(model_version):
+                    promoted = True
+            else:
+                print("Keeping current model (new model did not meet threshold)")
+                print(f"New model registered as version {model_version} (not promoted)")
+
+    if promoted or force_promote:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         torch.save(new_model.state_dict(), CANDIDATE_MODEL_PATH)
         promote_model()
-        promoted = True
-    elif should_promote:
-        print("Promoting new model...")
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        torch.save(new_model.state_dict(), CANDIDATE_MODEL_PATH)
-        promote_model()
-        promoted = True
-    else:
-        print("Keeping current model (new model did not meet threshold)")
-        promoted = False
 
     if not dry_run:
         save_metrics(current_metrics, new_metrics, promoted, improvement, config)
