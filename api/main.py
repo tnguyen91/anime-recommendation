@@ -9,19 +9,24 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, APIRouter, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from api.app_state import AppState, init_app_state
 from api.config import DEFAULT_TOP_N, MIN_LIKES_ANIME, MIN_LIKES_USER, N_HIDDEN
+from api.database import get_db
 from api.inference.data_loader import load_anime_dataset
 from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
 from api.inference.preprocess import filter_data
 from api.inference.recommender import get_recommendations
 from api.auth.router import router as auth_router
+from api.auth.dependencies import get_optional_current_user
 from api.favorites.router import router as favorites_router
+from api.feedback.router import router as feedback_router
+from api.feedback.queries import get_excluded_anime_ids_for_user
 from api.settings import settings
 from api.monitoring import get_prediction_logger
 
@@ -199,9 +204,15 @@ async def health(app_state: AppState = Depends(get_app_state)):
 async def recommend(
     request: Request,
     body: RecommendRequest,
-    app_state: AppState = Depends(get_app_state)
+    app_state: AppState = Depends(get_app_state),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_optional_current_user)
 ):
-    """Get personalized anime recommendations based on liked anime."""
+    """Get personalized anime recommendations based on liked anime.
+    
+    For authenticated users, anime marked as 'dismissed' or 'watched' in feedback
+    will be automatically excluded from recommendations.
+    """
     # ========== INPUT VALIDATION ==========
     if not body.liked_anime:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="liked_anime must be a non-empty list")
@@ -221,7 +232,17 @@ async def recommend(
 
     try:
         top_n = min(body.top_n, 50)
-        exclude_ids = body.exclude_ids[:200]
+        exclude_ids = list(body.exclude_ids[:200])  # User-provided exclusions
+        
+        # For authenticated users, also exclude anime they've dismissed or watched
+        user_id = None
+        if current_user:
+            user_id = current_user.id
+            feedback_exclusions = get_excluded_anime_ids_for_user(db, user_id)
+            exclude_ids = list(set(exclude_ids + feedback_exclusions))
+            if feedback_exclusions:
+                logger.info(f"User {user_id}: excluding {len(feedback_exclusions)} anime from feedback")
+        
         logger.info(f"Generating {top_n} recommendations for {len(matched_ids)} matched anime (excluding {len(exclude_ids)} IDs)")
 
         input_vec = torch.FloatTensor([[1 if a in matched_ids else 0 for a in app_state.anime_ids]]).to(app_state.device)
@@ -245,7 +266,7 @@ async def recommend(
             input_anime_ids=matched_ids,
             output_anime_ids=output_anime_ids,
             latency_ms=latency_ms,
-            user_id=None,  # TODO: Extract from JWT if authenticated
+            user_id=user_id,
             success=True
         )
         pred_logger.log(log_entry)
@@ -260,7 +281,7 @@ async def recommend(
             input_anime_ids=matched_ids,
             output_anime_ids=[],
             latency_ms=latency_ms,
-            user_id=None,
+            user_id=user_id if 'user_id' in dir() else None,
             success=False,
             error_message=str(e)
         )
@@ -330,6 +351,7 @@ async def search_anime(
 
 v1_router.include_router(auth_router)
 v1_router.include_router(favorites_router)
+v1_router.include_router(feedback_router)
 app.include_router(v1_router)
 
 

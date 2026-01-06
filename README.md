@@ -62,6 +62,7 @@ anime-recommendation/
 ├── api/                    # FastAPI backend
 │   ├── auth/               # Authentication (JWT)
 │   ├── favorites/          # User favorites CRUD
+│   ├── feedback/           # Recommendation feedback
 │   ├── inference/          # RBM model & recommendations
 │   ├── monitoring.py       # Prediction logging
 │   ├── alembic/            # Database migrations
@@ -93,6 +94,10 @@ anime-recommendation/
 | `/api/v1/auth/register` | POST | Create account |
 | `/api/v1/auth/login` | POST | Login |
 | `/api/v1/favorites` | GET/POST/DELETE | Manage favorites |
+| `/api/v1/feedback` | POST | Submit recommendation feedback |
+| `/api/v1/feedback/bulk` | POST | Submit multiple feedback items |
+| `/api/v1/feedback/stats` | GET | Get feedback statistics |
+| `/api/v1/feedback/history` | GET | Get feedback history |
 
 **Example:**
 ```bash
@@ -100,6 +105,22 @@ curl -X POST https://animereco-api-725392014501.us-west1.run.app/api/v1/recommen
   -H "Content-Type: application/json" \
   -d '{"liked_anime": ["Steins;Gate", "Death Note"]}'
 ```
+
+### Feedback Loop
+
+The feedback endpoint enables a closed-loop system for model improvement:
+
+```bash
+# Record user interaction with a recommendation
+curl -X POST https://animereco-api-725392014501.us-west1.run.app/api/v1/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"anime_id": 1, "action": "favorited"}'
+```
+
+Supported actions:
+- `favorited` - Positive signal for retraining
+- `dismissed` - Negative signal for retraining
+- `watched` - Exclude from future recommendations
 
 ## Development
 

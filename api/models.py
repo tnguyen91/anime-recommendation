@@ -18,6 +18,7 @@ class User(Base):
 
     favorites = relationship("UserFavorite", back_populates="user", cascade="all, delete-orphan")
     recommendations = relationship("RecommendationHistory", back_populates="user", cascade="all, delete-orphan")
+    feedback = relationship("RecommendationFeedback", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email})>"
@@ -56,3 +57,20 @@ class RecommendationHistory(Base):
 
     def __repr__(self):
         return f"<RecommendationHistory(user_id={self.user_id}, anime_id={self.anime_id})>"
+
+
+class RecommendationFeedback(Base):
+    """User feedback on recommendations."""
+    __tablename__ = "recommendation_feedback"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    anime_id = Column(Integer, nullable=False, index=True)
+    action = Column(String(50), nullable=False, index=True)
+    recommendation_request_id = Column(String(50), nullable=True)
+    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    user = relationship("User", back_populates="feedback")
+
+    def __repr__(self):
+        return f"<RecommendationFeedback(user_id={self.user_id}, anime_id={self.anime_id}, action={self.action})>"
