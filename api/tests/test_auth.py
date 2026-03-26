@@ -131,8 +131,8 @@ class TestAuthRegister:
                 "password": "anotherpassword123"
             }
         )
-        assert response.status_code == 400
-        assert "already registered" in response.json()["detail"]
+        assert response.status_code == 409
+        assert "already registered" in response.json()["error"]["message"]
     
     def test_register_short_password(self, client):
         """Password less than 8 characters should fail."""
@@ -184,7 +184,7 @@ class TestAuthLogin:
             }
         )
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        assert "Incorrect email or password" in response.json()["error"]["message"]
     
     def test_login_nonexistent_user(self, client):
         """Login with non-existent email should fail."""

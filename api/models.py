@@ -1,6 +1,6 @@
 """SQLAlchemy database models for users, favorites, and recommendation tracking."""
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from api.database import Base
 
@@ -62,6 +62,9 @@ class RecommendationHistory(Base):
 class RecommendationFeedback(Base):
     """User feedback on recommendations."""
     __tablename__ = "recommendation_feedback"
+    __table_args__ = (
+        Index("ix_feedback_user_action", "user_id", "action"),
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)

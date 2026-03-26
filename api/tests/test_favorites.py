@@ -173,8 +173,8 @@ class TestAddFavorite:
             json={"anime_id": 1},  # Same as test_favorite
             headers=auth_headers
         )
-        assert response.status_code == 400
-        assert "already in favorites" in response.json()["detail"]
+        assert response.status_code == 409
+        assert "already in favorites" in response.json()["error"]["message"]
     
     def test_add_favorite_invalid_anime_id(self, client, auth_headers):
         """Adding with invalid anime_id should fail."""
