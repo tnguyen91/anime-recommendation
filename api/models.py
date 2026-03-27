@@ -1,12 +1,16 @@
 """SQLAlchemy database models for users, favorites, and recommendation tracking."""
-from datetime import datetime, timezone
-from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, Boolean, UniqueConstraint
+
+from datetime import UTC, datetime
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
+
 from api.database import Base
 
 
 class User(Base):
     """User account model."""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -14,7 +18,7 @@ class User(Base):
     username = Column(String(100), unique=True, index=True, nullable=True)
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     favorites = relationship("UserFavorite", back_populates="user", cascade="all, delete-orphan")
     recommendations = relationship("RecommendationHistory", back_populates="user", cascade="all, delete-orphan")
@@ -26,15 +30,14 @@ class User(Base):
 
 class UserFavorite(Base):
     """User's favorite anime."""
+
     __tablename__ = "user_favorites"
-    __table_args__ = (
-        UniqueConstraint('user_id', 'anime_id', name='uix_user_anime'),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "anime_id", name="uix_user_anime"),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     anime_id = Column(Integer, nullable=False, index=True)
-    added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    added_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     user = relationship("User", back_populates="favorites")
 
@@ -44,12 +47,13 @@ class UserFavorite(Base):
 
 class RecommendationHistory(Base):
     """Recommendation engagement tracking for model improvement."""
+
     __tablename__ = "recommendation_history"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     anime_id = Column(Integer, nullable=False, index=True)
-    recommended_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    recommended_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     clicked = Column(Boolean, default=False, nullable=False)
     favorited = Column(Boolean, default=False, nullable=False)
 
@@ -61,17 +65,16 @@ class RecommendationHistory(Base):
 
 class RecommendationFeedback(Base):
     """User feedback on recommendations."""
+
     __tablename__ = "recommendation_feedback"
-    __table_args__ = (
-        Index("ix_feedback_user_action", "user_id", "action"),
-    )
+    __table_args__ = (Index("ix_feedback_user_action", "user_id", "action"),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     anime_id = Column(Integer, nullable=False, index=True)
     action = Column(String(50), nullable=False, index=True)
     recommendation_request_id = Column(String(50), nullable=True)
-    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    recorded_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True)
 
     user = relationship("User", back_populates="feedback")
 

@@ -1,4 +1,5 @@
 """Centralized application settings with Pydantic validation."""
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -54,6 +55,7 @@ class Settings(BaseSettings):
         # Handle JSON array format
         if v.startswith("["):
             import json
+
             try:
                 parsed = json.loads(v)
                 if isinstance(parsed, list):

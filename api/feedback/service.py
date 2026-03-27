@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -22,9 +22,7 @@ class FeedbackService:
     def __init__(self, db: Session):
         self.repo = FeedbackRepository(db)
 
-    def submit_feedback(
-        self, feedback_data: FeedbackCreate, user_id: int | None = None
-    ) -> FeedbackResponse:
+    def submit_feedback(self, feedback_data: FeedbackCreate, user_id: int | None = None) -> FeedbackResponse:
         record = self.repo.create(
             anime_id=feedback_data.anime_id,
             action=feedback_data.action.value,
@@ -44,9 +42,7 @@ class FeedbackService:
             recorded_at=record.recorded_at,
         )
 
-    def submit_bulk(
-        self, bulk_data: BulkFeedbackCreate, user_id: int | None = None
-    ) -> BulkFeedbackResponse:
+    def submit_bulk(self, bulk_data: BulkFeedbackCreate, user_id: int | None = None) -> BulkFeedbackResponse:
         items = [
             {
                 "user_id": user_id,
@@ -64,7 +60,7 @@ class FeedbackService:
         )
 
     def get_stats(self, user_id: int, days: int = 30) -> FeedbackStatsResponse:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
 
         action_counts = self.repo.get_action_counts(user_id, cutoff)
         top_favorited = self.repo.get_top_anime_by_action(user_id, "favorited", cutoff)

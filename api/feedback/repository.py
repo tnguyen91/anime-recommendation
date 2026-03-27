@@ -49,9 +49,7 @@ class FeedbackRepository:
         )
         return {action: count for action, count in rows}
 
-    def get_top_anime_by_action(
-        self, user_id: int, action: str, since: datetime, limit: int = 10
-    ) -> list[dict]:
+    def get_top_anime_by_action(self, user_id: int, action: str, since: datetime, limit: int = 10) -> list[dict]:
         rows = (
             self.db.query(
                 RecommendationFeedback.anime_id,
@@ -77,24 +75,15 @@ class FeedbackRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[RecommendationFeedback], int]:
-        query = self.db.query(RecommendationFeedback).filter(
-            RecommendationFeedback.user_id == user_id
-        )
+        query = self.db.query(RecommendationFeedback).filter(RecommendationFeedback.user_id == user_id)
         if action:
             query = query.filter(RecommendationFeedback.action == action)
 
         total = query.count()
-        items = (
-            query.order_by(RecommendationFeedback.recorded_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        items = query.order_by(RecommendationFeedback.recorded_at.desc()).offset(offset).limit(limit).all()
         return items, total
 
-    def get_excluded_anime_ids(
-        self, user_id: int, actions: list[str] | None = None
-    ) -> list[int]:
+    def get_excluded_anime_ids(self, user_id: int, actions: list[str] | None = None) -> list[int]:
         if actions is None:
             actions = ["dismissed", "watched"]
         rows = (

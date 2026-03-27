@@ -1,15 +1,17 @@
 """Data preprocessing utilities for filtering and transforming anime datasets."""
+
 from __future__ import annotations
+
 import pandas as pd
-from typing import Tuple
+
 from api.config import RATING_THRESHOLD
 
 
-def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def filter_hentai(ratings: pd.DataFrame, anime: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Remove adult content from datasets."""
-    mask = ~anime.apply(lambda row: row.astype(str).str.contains('Hentai', case=False, na=False)).any(axis=1)
+    mask = ~anime.apply(lambda row: row.astype(str).str.contains("Hentai", case=False, na=False)).any(axis=1)
     anime_clean = anime[mask]
-    ratings_clean = ratings[ratings['anime_id'].isin(anime_clean['anime_id'])]
+    ratings_clean = ratings[ratings["anime_id"].isin(anime_clean["anime_id"])]
     return ratings_clean, anime_clean
 
 
@@ -20,13 +22,13 @@ def filter_data(
 ) -> tuple[list[int], pd.DataFrame]:
     """Filter to active users and popular anime for reduced sparsity."""
     df = ratings_df.copy()
-    df = df[df['status'] == 'Completed']
-    df['liked'] = (df['score'] >= RATING_THRESHOLD).astype(int)
-    anime_likes = df.groupby('anime_id')['liked'].sum()
+    df = df[df["status"] == "Completed"]
+    df["liked"] = (df["score"] >= RATING_THRESHOLD).astype(int)
+    anime_likes = df.groupby("anime_id")["liked"].sum()
     active_anime = anime_likes[anime_likes >= min_likes_anime].index
-    df = df[df['anime_id'].isin(active_anime)]
-    user_likes = df.groupby('user_id')['liked'].sum()
+    df = df[df["anime_id"].isin(active_anime)]
+    user_likes = df.groupby("user_id")["liked"].sum()
     active_users = user_likes[user_likes >= min_likes_user].index
-    df = df[df['user_id'].isin(active_users)]
+    df = df[df["user_id"].isin(active_users)]
 
     return list(active_anime.astype(int)), df

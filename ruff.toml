@@ -15,7 +15,12 @@ select = [
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
+    "B008",  # Depends() in defaults — standard FastAPI pattern
 ]
+
+[lint.per-file-ignores]
+"api/tests/*.py" = ["E402"]
+"api/alembic/*.py" = ["E402"]
 
 [lint.isort]
 known-first-party = ["api", "rbm"]

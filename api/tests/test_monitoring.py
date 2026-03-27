@@ -1,11 +1,10 @@
 """Unit tests for the monitoring module."""
+
 import json
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 # Add project root to path for monitoring module imports
 project_root = Path(__file__).parent.parent.parent
@@ -29,7 +28,7 @@ class TestPredictionLog:
             output_count=5,
             latency_ms=150.5,
             success=True,
-            error_message=None
+            error_message=None,
         )
 
         assert log.request_id == "abc12345"
@@ -52,7 +51,7 @@ class TestPredictionLog:
             output_count=0,
             latency_ms=50.0,
             success=False,
-            error_message="Model inference failed"
+            error_message="Model inference failed",
         )
 
         assert log.success is False
@@ -70,7 +69,7 @@ class TestPredictionLog:
             output_anime_ids=[10, 20],
             output_count=2,
             latency_ms=100.0,
-            success=True
+            success=True,
         )
 
         json_str = log.model_dump_json()
@@ -111,10 +110,7 @@ class TestPredictionLogger:
             logger = PredictionLogger(log_dir=Path(tmpdir))
 
             entry = logger.create_log_entry(
-                input_anime_ids=[1, 2, 3],
-                output_anime_ids=[10, 20, 30, 40, 50],
-                latency_ms=200.5,
-                user_id=42
+                input_anime_ids=[1, 2, 3], output_anime_ids=[10, 20, 30, 40, 50], latency_ms=200.5, user_id=42
             )
 
             assert len(entry.request_id) == 8
@@ -125,7 +121,7 @@ class TestPredictionLogger:
             assert entry.success is True
             # Timestamp should be recent
             ts = datetime.fromisoformat(entry.timestamp.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             assert (now - ts).total_seconds() < 5
 
     def test_log_writes_to_file(self):
@@ -136,9 +132,7 @@ class TestPredictionLogger:
             # Log multiple entries
             for i in range(3):
                 entry = logger.create_log_entry(
-                    input_anime_ids=[i, i + 1],
-                    output_anime_ids=[i * 10],
-                    latency_ms=100.0 + i
+                    input_anime_ids=[i, i + 1], output_anime_ids=[i * 10], latency_ms=100.0 + i
                 )
                 logger.log(entry)
 
@@ -162,11 +156,7 @@ class TestPredictionLogger:
             # Make the log file a directory to cause write errors
             logger.log_file.mkdir(parents=True, exist_ok=True)
 
-            entry = logger.create_log_entry(
-                input_anime_ids=[1],
-                output_anime_ids=[10],
-                latency_ms=100.0
-            )
+            entry = logger.create_log_entry(input_anime_ids=[1], output_anime_ids=[10], latency_ms=100.0)
 
             # This should not raise an exception
             logger.log(entry)
@@ -182,20 +172,12 @@ class TestLogFileOperations:
 
             # First logger writes entries
             logger1 = PredictionLogger(log_dir=log_dir)
-            entry1 = logger1.create_log_entry(
-                input_anime_ids=[1],
-                output_anime_ids=[10],
-                latency_ms=100.0
-            )
+            entry1 = logger1.create_log_entry(input_anime_ids=[1], output_anime_ids=[10], latency_ms=100.0)
             logger1.log(entry1)
 
             # Second logger (simulating app restart) appends
             logger2 = PredictionLogger(log_dir=log_dir)
-            entry2 = logger2.create_log_entry(
-                input_anime_ids=[2],
-                output_anime_ids=[20],
-                latency_ms=200.0
-            )
+            entry2 = logger2.create_log_entry(input_anime_ids=[2], output_anime_ids=[20], latency_ms=200.0)
             logger2.log(entry2)
 
             # Verify both entries are in the file
@@ -209,11 +191,7 @@ class TestLogFileOperations:
         with tempfile.TemporaryDirectory() as tmpdir:
             logger = PredictionLogger(log_dir=Path(tmpdir))
 
-            entry = logger.create_log_entry(
-                input_anime_ids=[1],
-                output_anime_ids=[10],
-                latency_ms=100.0
-            )
+            entry = logger.create_log_entry(input_anime_ids=[1], output_anime_ids=[10], latency_ms=100.0)
 
             # Should end with Z (UTC) or +00:00
             assert entry.timestamp.endswith("Z") or "+00:00" in entry.timestamp
@@ -226,11 +204,7 @@ class TestLogFileOperations:
             input_ids = [1, 5, 20, 50, 100, 200, 500]
             output_ids = [10, 25, 30, 45, 60, 75, 80, 90, 95, 99]
 
-            entry = logger.create_log_entry(
-                input_anime_ids=input_ids,
-                output_anime_ids=output_ids,
-                latency_ms=150.0
-            )
+            entry = logger.create_log_entry(input_anime_ids=input_ids, output_anime_ids=output_ids, latency_ms=150.0)
             logger.log(entry)
 
             # Read back and verify

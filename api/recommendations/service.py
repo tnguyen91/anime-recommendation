@@ -35,9 +35,7 @@ class RecommendationService:
         if self.app_state.anime_df is None:
             raise ServiceUnavailableError("Dataset not loaded")
 
-        matched_ids = self.app_state.anime_df[
-            self.app_state.anime_df["name"].isin(liked_anime)
-        ]["anime_id"].tolist()
+        matched_ids = self.app_state.anime_df[self.app_state.anime_df["name"].isin(liked_anime)]["anime_id"].tolist()
 
         if not matched_ids:
             raise ValidationError("No matching anime found in our database")
@@ -56,9 +54,9 @@ class RecommendationService:
 
         prediction_start = time.time()
         try:
-            input_vec = torch.FloatTensor(
-                [[1 if a in matched_ids else 0 for a in self.app_state.anime_ids]]
-            ).to(self.app_state.device)
+            input_vec = torch.FloatTensor([[1 if a in matched_ids else 0 for a in self.app_state.anime_ids]]).to(
+                self.app_state.device
+            )
 
             recs = get_recommendations(
                 input_vec.squeeze(0),
@@ -72,40 +70,28 @@ class RecommendationService:
 
             output_ids = recs["anime_id"].tolist() if not recs.empty else []
             latency_ms = (time.time() - prediction_start) * 1000
-            self._log_prediction(
-                matched_ids, output_ids, latency_ms, user_id, success=True
-            )
+            self._log_prediction(matched_ids, output_ids, latency_ms, user_id, success=True)
 
             return [self._build_result(row) for _, row in recs.iterrows()]
 
         except Exception:
             latency_ms = (time.time() - prediction_start) * 1000
-            self._log_prediction(
-                matched_ids, [], latency_ms, user_id, success=False
-            )
+            self._log_prediction(matched_ids, [], latency_ms, user_id, success=False)
             raise
 
-    def search(
-        self, query: str, limit: int = 20, offset: int = 0
-    ) -> tuple[list[AnimeResult], int]:
+    def search(self, query: str, limit: int = 20, offset: int = 0) -> tuple[list[AnimeResult], int]:
         if self.app_state.anime_df is None:
             raise ServiceUnavailableError("Dataset not loaded")
 
         anime_df = self.app_state.anime_df
-        name_cols = [
-            c for c in ["name", "title_english", "title_japanese"] if c in anime_df.columns
-        ]
+        name_cols = [c for c in ["name", "title_english", "title_japanese"] if c in anime_df.columns]
 
         mask = pd.Series(False, index=anime_df.index)
         for col in name_cols:
             mask |= anime_df[col].astype(str).str.contains(query, case=False, na=False)
 
         matches = anime_df[mask]
-        cols = [
-            c
-            for c in ["anime_id", "name", "title_english", "title_japanese"]
-            if c in matches.columns
-        ]
+        cols = [c for c in ["anime_id", "name", "title_english", "title_japanese"] if c in matches.columns]
         matches = matches[cols].drop_duplicates()
 
         total = len(matches)

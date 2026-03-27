@@ -1,11 +1,15 @@
 """Recommendation generation using the trained RBM model."""
+
 from __future__ import annotations
-from typing import Sequence
+
+from collections.abc import Sequence
+
 import numpy as np
 import pandas as pd
 import torch
 
 from api.config import DEFAULT_TOP_N
+
 
 def get_recommendations(
     input_vector: Sequence[int] | torch.Tensor,
@@ -14,7 +18,7 @@ def get_recommendations(
     anime_df: pd.DataFrame,
     top_n: int = DEFAULT_TOP_N,
     exclude_ids: list[int] | None = None,
-    device: str = 'cpu',
+    device: str = "cpu",
 ) -> pd.DataFrame:
     """Generate top-N anime recommendations from RBM reconstruction probabilities."""
     rbm.eval()
@@ -41,21 +45,21 @@ def get_recommendations(
     top_indices = scores.argsort()[::-1][:top_n]
     top_anime_ids = [anime_ids[i] for i in top_indices]
 
-    recommended = anime_df[anime_df['anime_id'].isin(top_anime_ids)].copy()
+    recommended = anime_df[anime_df["anime_id"].isin(top_anime_ids)].copy()
 
-    existing_ids = [aid for aid in top_anime_ids if aid in recommended['anime_id'].values]
+    existing_ids = [aid for aid in top_anime_ids if aid in recommended["anime_id"].values]
     if not existing_ids:
-        return pd.DataFrame(columns=['anime_id', 'name', 'score'])
+        return pd.DataFrame(columns=["anime_id", "name", "score"])
 
-    recommended = recommended.set_index('anime_id').loc[existing_ids]
+    recommended = recommended.set_index("anime_id").loc[existing_ids]
     id_to_score = {anime_ids[i]: scores[i] for i in top_indices}
-    recommended['score'] = [id_to_score[aid] for aid in existing_ids]
+    recommended["score"] = [id_to_score[aid] for aid in existing_ids]
     recommended = recommended.reset_index()
 
-    cols = ['anime_id', 'name', 'score']
-    if 'title_english' in recommended.columns:
-        cols.append('title_english')
-    if 'title_japanese' in recommended.columns:
-        cols.append('title_japanese')
+    cols = ["anime_id", "name", "score"]
+    if "title_english" in recommended.columns:
+        cols.append("title_english")
+    if "title_japanese" in recommended.columns:
+        cols.append("title_japanese")
 
     return recommended[cols]

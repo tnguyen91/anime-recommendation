@@ -1,4 +1,5 @@
 """Tests for inference module: RBM model and recommendation generation."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -79,11 +80,13 @@ class TestGetRecommendations:
     @pytest.fixture
     def mock_anime_df(self):
         """Create mock anime DataFrame."""
-        return pd.DataFrame({
-            'anime_id': [1, 2, 3, 4, 5],
-            'name': ['Anime A', 'Anime B', 'Anime C', 'Anime D', 'Anime E'],
-            'title_english': ['A English', 'B English', 'C English', 'D English', 'E English'],
-        })
+        return pd.DataFrame(
+            {
+                "anime_id": [1, 2, 3, 4, 5],
+                "name": ["Anime A", "Anime B", "Anime C", "Anime D", "Anime E"],
+                "title_english": ["A English", "B English", "C English", "D English", "E English"],
+            }
+        )
 
     @pytest.fixture
     def anime_ids(self):
@@ -93,21 +96,17 @@ class TestGetRecommendations:
     def test_basic_recommendations(self, mock_rbm, anime_ids, mock_anime_df):
         """Basic recommendation returns expected structure."""
         input_vec = [1, 0, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3)
         assert isinstance(result, pd.DataFrame)
-        assert 'anime_id' in result.columns
-        assert 'name' in result.columns
-        assert 'score' in result.columns
+        assert "anime_id" in result.columns
+        assert "name" in result.columns
+        assert "score" in result.columns
         assert len(result) <= 3
 
     def test_excludes_liked_anime(self, mock_rbm, anime_ids, mock_anime_df):
         """Liked anime get negative scores (effectively excluded)."""
         input_vec = [1, 1, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3)
         # With top_n=3, only top 3 are returned; liked items should have negative scores
         # and not appear in top recommendations
         assert len(result) <= 3
@@ -115,59 +114,43 @@ class TestGetRecommendations:
     def test_exclude_ids_parameter(self, mock_rbm, anime_ids, mock_anime_df):
         """Excluded IDs get negative scores."""
         input_vec = [0, 0, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df,
-            top_n=3, exclude_ids=[1, 2]
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3, exclude_ids=[1, 2])
         # With top_n=3 and 2 excluded from 5, we get 3 non-excluded
         assert len(result) <= 3
 
     def test_tensor_input(self, mock_rbm, anime_ids, mock_anime_df):
         """Works with torch.Tensor input."""
         input_vec = torch.FloatTensor([1, 0, 0, 0, 0])
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3)
         assert len(result) <= 3
 
     def test_numpy_input(self, mock_rbm, anime_ids, mock_anime_df):
         """Works with numpy array input."""
         input_vec = np.array([1, 0, 0, 0, 0])
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3)
         assert len(result) <= 3
 
     def test_empty_exclude_ids(self, mock_rbm, anime_ids, mock_anime_df):
         """Empty exclude_ids works correctly."""
         input_vec = [1, 0, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df,
-            top_n=3, exclude_ids=[]
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3, exclude_ids=[])
         assert len(result) <= 3
 
     def test_top_n_limit(self, mock_rbm, anime_ids, mock_anime_df):
         """Respects top_n parameter."""
         input_vec = [1, 0, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=2
-        )
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=2)
         assert len(result) <= 2
 
     def test_missing_anime_in_df(self, mock_rbm, mock_anime_df):
         """Handles anime_ids not present in DataFrame."""
         anime_ids = [1, 2, 3, 999, 998]
         input_vec = [1, 0, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=5
-        )
-        assert all(aid in [1, 2, 3] for aid in result['anime_id'].tolist())
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=5)
+        assert all(aid in [1, 2, 3] for aid in result["anime_id"].tolist())
 
     def test_scores_are_numeric(self, mock_rbm, anime_ids, mock_anime_df):
         """Recommendation scores are numeric."""
         input_vec = [1, 0, 0, 0, 0]
-        result = get_recommendations(
-            input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3
-        )
-        assert result['score'].dtype in [np.float32, np.float64]
+        result = get_recommendations(input_vec, mock_rbm, anime_ids, mock_anime_df, top_n=3)
+        assert result["score"].dtype in [np.float32, np.float64]

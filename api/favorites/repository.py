@@ -17,9 +17,7 @@ class FavoriteRepository:
 
     def find_by_id_and_user(self, favorite_id: int, user_id: int) -> UserFavorite | None:
         return (
-            self.db.query(UserFavorite)
-            .filter(UserFavorite.id == favorite_id, UserFavorite.user_id == user_id)
-            .first()
+            self.db.query(UserFavorite).filter(UserFavorite.id == favorite_id, UserFavorite.user_id == user_id).first()
         )
 
     def find_by_anime_and_user(self, anime_id: int, user_id: int) -> UserFavorite | None:

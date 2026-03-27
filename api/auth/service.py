@@ -41,8 +41,6 @@ class AuthService:
         if not user.is_active:
             raise ForbiddenError("Account is disabled")
 
-        access_token = create_access_token(
-            data={"sub": str(user.id), "email": user.email}
-        )
+        access_token = create_access_token(data={"sub": str(user.id), "email": user.email})
         logger.info("User logged in: id=%d", user.id)
         return access_token

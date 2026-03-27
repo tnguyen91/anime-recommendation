@@ -4,18 +4,17 @@ Alembic environment configuration for database migrations.
 Configures database connection from environment variables and sets up
 SQLAlchemy metadata for autogenerate support.
 """
-from logging.config import fileConfig
+
 import os
 import sys
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from logging.config import fileConfig
 
 from alembic import context
 from dotenv import load_dotenv
+from sqlalchemy import engine_from_config, pool
 
 # Load environment variables
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
 load_dotenv(env_path)
 
 # Add project root to path for model imports
@@ -24,7 +23,6 @@ project_root = os.path.dirname(api_dir)
 sys.path.insert(0, project_root)
 
 from api.database import Base
-from api.models import User, UserFavorite, RecommendationHistory
 
 config = context.config
 
@@ -69,9 +67,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

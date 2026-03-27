@@ -1,9 +1,9 @@
 """Monitoring module for tracking ML predictions and system health."""
+
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -15,14 +15,14 @@ class PredictionLog(BaseModel):
 
     request_id: str
     timestamp: str
-    user_id: Optional[int] = None
+    user_id: int | None = None
     input_anime_ids: list[int]
     input_count: int
     output_anime_ids: list[int]
     output_count: int
     latency_ms: float
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 class PredictionLogger:
@@ -52,14 +52,14 @@ class PredictionLogger:
         input_anime_ids: list[int],
         output_anime_ids: list[int],
         latency_ms: float,
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
         success: bool = True,
-        error_message: Optional[str] = None
+        error_message: str | None = None,
     ) -> PredictionLog:
         """Create a PredictionLog with auto-generated timestamp and request ID."""
         return PredictionLog(
             request_id=self.generate_request_id(),
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             user_id=user_id,
             input_anime_ids=input_anime_ids,
             input_count=len(input_anime_ids),
@@ -67,7 +67,7 @@ class PredictionLogger:
             output_count=len(output_anime_ids),
             latency_ms=latency_ms,
             success=success,
-            error_message=error_message
+            error_message=error_message,
         )
 
 

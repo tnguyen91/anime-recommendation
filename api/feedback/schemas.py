@@ -1,11 +1,10 @@
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class FeedbackAction(str, Enum):
+class FeedbackAction(StrEnum):
     FAVORITED = "favorited"
     DISMISSED = "dismissed"
     WATCHED = "watched"
@@ -14,7 +13,7 @@ class FeedbackAction(str, Enum):
 class FeedbackCreate(BaseModel):
     anime_id: int = Field(..., gt=0, description="The anime ID the feedback is for")
     action: FeedbackAction = Field(..., description="The type of feedback action")
-    recommendation_request_id: Optional[str] = Field(
+    recommendation_request_id: str | None = Field(
         None,
         max_length=50,
         description="Optional request ID from the recommendation that generated this anime",
@@ -57,7 +56,7 @@ class FeedbackHistoryItem(BaseModel):
     anime_id: int
     action: str
     recorded_at: datetime
-    recommendation_request_id: Optional[str] = None
+    recommendation_request_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

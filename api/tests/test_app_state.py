@@ -1,12 +1,12 @@
 """Tests for AppState container."""
+
 import json
 import tempfile
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
-from api.app_state import AppState, init_app_state, get_app_state
+from api.app_state import AppState, get_app_state, init_app_state
 
 
 class TestAppState:
@@ -28,6 +28,7 @@ class TestAppState:
         assert state.model_loaded is False
 
         from api.inference.model import RBM
+
         state.rbm = RBM(n_visible=10, n_hidden=5)
         assert state.model_loaded is True
 
@@ -36,7 +37,7 @@ class TestAppState:
         state = AppState()
         assert state.dataset_loaded is False
 
-        state.anime_df = pd.DataFrame({'anime_id': [1, 2, 3]})
+        state.anime_df = pd.DataFrame({"anime_id": [1, 2, 3]})
         assert state.dataset_loaded is True
 
     def test_dataset_loaded_empty_df(self):
@@ -99,7 +100,7 @@ class TestAppState:
     def test_load_metadata_from_file(self):
         """load_metadata reads JSON file correctly."""
         state = AppState()
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"1": {"name": "Anime 1"}, "2": {"name": "Anime 2"}}, f)
             temp_path = Path(f.name)
 
@@ -119,14 +120,14 @@ class TestAppState:
     def test_load_anime_csv(self):
         """load_anime_csv reads CSV file correctly."""
         state = AppState()
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write("anime_id,name\n1,Test Anime\n2,Another Anime\n")
             temp_path = Path(f.name)
 
         try:
             state.load_anime_csv(temp_path)
             assert len(state.anime_df) == 2
-            assert state.anime_df.iloc[0]['name'] == "Test Anime"
+            assert state.anime_df.iloc[0]["name"] == "Test Anime"
         finally:
             temp_path.unlink()
 
@@ -143,10 +144,11 @@ class TestHealthStatus:
     def test_all_services_ok(self):
         """Health status OK when all services loaded."""
         state = AppState()
-        state.anime_df = pd.DataFrame({'anime_id': [1, 2, 3]})
-        state.ratings_df = pd.DataFrame({'user_id': [1, 2], 'score': [8, 9]})
+        state.anime_df = pd.DataFrame({"anime_id": [1, 2, 3]})
+        state.ratings_df = pd.DataFrame({"user_id": [1, 2], "score": [8, 9]})
         state.anime_metadata = {"1": {}}
         from api.inference.model import RBM
+
         state.rbm = RBM(n_visible=10, n_hidden=5)
 
         status = state.get_health_status()
@@ -158,7 +160,7 @@ class TestHealthStatus:
     def test_degraded_without_model(self):
         """Health status degraded without model."""
         state = AppState()
-        state.anime_df = pd.DataFrame({'anime_id': [1]})
+        state.anime_df = pd.DataFrame({"anime_id": [1]})
         state.anime_metadata = {"1": {}}
 
         status = state.get_health_status()
@@ -170,6 +172,7 @@ class TestHealthStatus:
         state = AppState()
         state.anime_metadata = {"1": {}}
         from api.inference.model import RBM
+
         state.rbm = RBM(n_visible=10, n_hidden=5)
 
         status = state.get_health_status()
@@ -179,8 +182,9 @@ class TestHealthStatus:
     def test_degraded_without_metadata(self):
         """Health status degraded without metadata."""
         state = AppState()
-        state.anime_df = pd.DataFrame({'anime_id': [1]})
+        state.anime_df = pd.DataFrame({"anime_id": [1]})
         from api.inference.model import RBM
+
         state.rbm = RBM(n_visible=10, n_hidden=5)
 
         status = state.get_health_status()
@@ -190,8 +194,8 @@ class TestHealthStatus:
     def test_includes_counts(self):
         """Health status includes data counts."""
         state = AppState()
-        state.anime_df = pd.DataFrame({'anime_id': [1, 2, 3]})
-        state.ratings_df = pd.DataFrame({'user_id': [1, 2], 'score': [8, 9]})
+        state.anime_df = pd.DataFrame({"anime_id": [1, 2, 3]})
+        state.ratings_df = pd.DataFrame({"user_id": [1, 2], "score": [8, 9]})
         state.anime_metadata = {"1": {}, "2": {}}
 
         status = state.get_health_status()

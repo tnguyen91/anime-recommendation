@@ -1,11 +1,13 @@
 """File download utilities with caching and retry support."""
+
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Union
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -40,12 +42,12 @@ def _build_session(max_retries: int = 3, backoff_factor: float = 0.5) -> request
 def download_file(
     url: str,
     destination_folder: str = ".",
-    filename: Optional[str] = None,
-    timeout: Union[int, Tuple[int, int]] = (5, 30),
-    checksum: Optional[str] = None,
-    progress_cb: Optional[ProgressCallback] = None,
+    filename: str | None = None,
+    timeout: int | tuple[int, int] = (5, 30),
+    checksum: str | None = None,
+    progress_cb: ProgressCallback | None = None,
     chunk_size: int = 64 * 1024,
-    session: Optional[requests.Session] = None,
+    session: requests.Session | None = None,
 ) -> Path:
     """
     Download file from URL with caching and optional checksum validation.
@@ -89,21 +91,18 @@ def download_file(
                         hash_obj.update(chunk)
                     downloaded += len(chunk)
                     if progress_cb:
-                        try:
+                        with contextlib.suppress(Exception):
                             progress_cb(downloaded, total)
-                        except Exception:
-                            pass
                 f.flush()
                 os.fsync(f.fileno())
 
-            if checksum and hash_obj:
-                if hash_obj.hexdigest().lower() != checksum.lower():
-                    tmp_path.unlink(missing_ok=True)
-                    raise ValueError("checksum mismatch for downloaded file")
+            if checksum and hash_obj and hash_obj.hexdigest().lower() != checksum.lower():
+                tmp_path.unlink(missing_ok=True)
+                raise ValueError("checksum mismatch for downloaded file")
 
             if total != -1 and tmp_path.stat().st_size != total:
                 tmp_path.unlink(missing_ok=True)
-                raise IOError("downloaded file size does not match Content-Length")
+                raise OSError("downloaded file size does not match Content-Length")
 
             os.replace(str(tmp_path), str(final_path))
             return final_path

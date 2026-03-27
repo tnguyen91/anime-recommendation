@@ -1,4 +1,5 @@
 """Application configuration constants."""
+
 from __future__ import annotations
 
 DEFAULT_TOP_N = 10

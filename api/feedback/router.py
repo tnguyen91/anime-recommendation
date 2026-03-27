@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -26,7 +25,7 @@ router = APIRouter(prefix="/feedback", tags=["Feedback"])
 def submit_feedback(
     feedback_data: FeedbackCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     service = FeedbackService(db)
     user_id = current_user.id if current_user else None
@@ -37,7 +36,7 @@ def submit_feedback(
 def submit_bulk_feedback(
     bulk_data: BulkFeedbackCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     service = FeedbackService(db)
     user_id = current_user.id if current_user else None
@@ -58,7 +57,7 @@ def get_feedback_stats(
 def get_feedback_history(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    action: Optional[FeedbackAction] = Query(default=None),
+    action: FeedbackAction | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

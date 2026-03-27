@@ -1,4 +1,5 @@
 """Application runtime state container for ML model and datasets."""
+
 from __future__ import annotations
 
 import json
@@ -20,22 +21,17 @@ logger = logging.getLogger(__name__)
 class AppState:
     """Runtime state container for ML model and datasets."""
 
-    device: torch.device = field(
-        default_factory=lambda: torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    )
+    device: torch.device = field(default_factory=lambda: torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     anime_metadata: dict[str, Any] = field(default_factory=dict)
     ratings_df: pd.DataFrame | None = None
     anime_df: pd.DataFrame | None = None
     anime_ids: list[int] = field(default_factory=list)
-    rbm: "RBM | None" = None
+    rbm: RBM | None = None
     is_initialized: bool = False
 
     def get_metadata(self, anime_id: int) -> dict[str, Any]:
         """Lookup metadata by anime_id (handles both str and int keys)."""
-        return (
-            self.anime_metadata.get(str(anime_id))
-            or self.anime_metadata.get(anime_id, {})
-        )
+        return self.anime_metadata.get(str(anime_id)) or self.anime_metadata.get(anime_id, {})
 
     def get_anime_info(self, anime_id: int) -> dict[str, Any]:
         """Get anime info from metadata or DataFrame for API responses."""
@@ -87,11 +83,7 @@ class AppState:
 
     def get_health_status(self) -> dict[str, Any]:
         """Generate health check response for all components."""
-        status: dict[str, Any] = {
-            "status": "ok",
-            "version": "1.0.0",
-            "services": {}
-        }
+        status: dict[str, Any] = {"status": "ok", "version": "1.0.0", "services": {}}
 
         if self.model_loaded:
             status["services"]["model"] = {"status": "ok", "type": "RBM"}
@@ -103,17 +95,14 @@ class AppState:
             status["services"]["dataset"] = {
                 "status": "ok",
                 "anime_count": len(self.anime_df),
-                "rating_count": len(self.ratings_df) if self.ratings_df is not None else 0
+                "rating_count": len(self.ratings_df) if self.ratings_df is not None else 0,
             }
         else:
             status["services"]["dataset"] = {"status": "error", "error": "Dataset not loaded"}
             status["status"] = "degraded"
 
         if self.metadata_loaded:
-            status["services"]["metadata"] = {
-                "status": "ok",
-                "entry_count": len(self.anime_metadata)
-            }
+            status["services"]["metadata"] = {"status": "ok", "entry_count": len(self.anime_metadata)}
         else:
             status["services"]["metadata"] = {"status": "error", "error": "Metadata not loaded"}
             status["status"] = "degraded"

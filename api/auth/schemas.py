@@ -1,9 +1,11 @@
 """Pydantic schemas for authentication requests and responses."""
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserCreate(BaseModel):
     """Schema for user registration request."""
+
     email: EmailStr
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
     username: str | None = Field(None, min_length=3, max_length=50)
@@ -11,6 +13,7 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
     """Schema for user response (excludes sensitive data like password)."""
+
     id: int
     email: str
     username: str | None
@@ -21,5 +24,6 @@ class UserResponse(BaseModel):
 
 class Token(BaseModel):
     """Schema for JWT token response after successful login."""
+
     access_token: str
     token_type: str = "bearer"

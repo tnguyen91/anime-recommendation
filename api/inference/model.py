@@ -1,6 +1,7 @@
 """Restricted Boltzmann Machine implementation for collaborative filtering."""
+
 from __future__ import annotations
-from typing import Tuple
+
 import torch
 import torch.nn as nn
 
@@ -17,12 +18,12 @@ class RBM(nn.Module):
         self.v_bias = nn.Parameter(torch.zeros(n_visible))
         self.h_bias = nn.Parameter(torch.zeros(n_hidden))
 
-    def sample_h(self, v: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sample_h(self, v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Sample hidden units given visible layer activation."""
         p_h = torch.sigmoid(torch.mm(v, self.W.t()) + self.h_bias)
         return p_h, torch.bernoulli(p_h)
 
-    def sample_v(self, h: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sample_v(self, h: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Reconstruct visible layer from hidden activation."""
         p_v = torch.sigmoid(torch.mm(h, self.W) + self.v_bias)
         return p_v, torch.bernoulli(p_v)

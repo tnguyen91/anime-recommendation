@@ -10,20 +10,19 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.app_state import AppState, init_app_state
+from api.auth.router import router as auth_router
 from api.config import MIN_LIKES_ANIME, MIN_LIKES_USER, N_HIDDEN
 from api.dependencies import get_app_state, limiter
 from api.exceptions import register_exception_handlers
+from api.favorites.router import router as favorites_router
+from api.feedback.router import router as feedback_router
 from api.inference.data_loader import load_anime_dataset
 from api.inference.downloads import download_to_cache
 from api.inference.model import RBM
 from api.inference.preprocess import filter_data
 from api.middleware import RequestIDMiddleware, configure_logging
-from api.settings import settings
-
-from api.auth.router import router as auth_router
-from api.favorites.router import router as favorites_router
-from api.feedback.router import router as feedback_router
 from api.recommendations.router import router as recommendations_router
+from api.settings import settings
 
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
@@ -49,9 +48,7 @@ async def lifespan(app: FastAPI):
 
     if app_state.anime_ids:
         logger.info("Initializing RBM with %d visible units...", len(app_state.anime_ids))
-        app_state.rbm = RBM(
-            n_visible=len(app_state.anime_ids), n_hidden=N_HIDDEN
-        ).to(app_state.device)
+        app_state.rbm = RBM(n_visible=len(app_state.anime_ids), n_hidden=N_HIDDEN).to(app_state.device)
 
         if settings.model_uri:
             logger.info("Loading model from %s...", settings.model_uri)

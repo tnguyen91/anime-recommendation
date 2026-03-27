@@ -1,11 +1,9 @@
 """Tests for settings validation."""
-import os
-import sys
-import pytest
-from pathlib import Path
-from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pathlib import Path
+
+import pytest
+from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +42,7 @@ class _TestableSettings(BaseSettings):
         # Handle JSON array format
         if v.startswith("["):
             import json
+
             try:
                 parsed = json.loads(v)
                 if isinstance(parsed, list):
@@ -79,12 +78,12 @@ class TestSettings:
 
     def test_jwt_secret_key_required(self):
         """JWT secret key is required."""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             Settings(jwt_secret_key=None)
 
     def test_jwt_secret_key_min_length(self):
         """JWT secret key must be at least 16 characters."""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             Settings(jwt_secret_key="short")
 
     def test_jwt_secret_key_valid(self):
@@ -104,17 +103,14 @@ class TestSettings:
 
     def test_jwt_expire_minutes_range(self):
         """JWT expiration must be between 1 and 43200 minutes."""
-        with pytest.raises(Exception):
-            Settings(
-                jwt_secret_key="this-is-a-valid-secret-key-123",
-                jwt_access_token_expire_minutes=0
-            )
+        with pytest.raises(ValidationError):
+            Settings(jwt_secret_key="this-is-a-valid-secret-key-123", jwt_access_token_expire_minutes=0)
 
     def test_allowed_origins_from_string(self):
         """Parses comma-separated origins string."""
         s = Settings(
             jwt_secret_key="this-is-a-valid-secret-key-123",
-            allowed_origins="http://localhost:3000,http://localhost:8080"
+            allowed_origins="http://localhost:3000,http://localhost:8080",
         )
         origins = s.get_allowed_origins()
         assert "http://localhost:3000" in origins
@@ -124,7 +120,7 @@ class TestSettings:
         """Parses JSON array string for origins."""
         s = Settings(
             jwt_secret_key="this-is-a-valid-secret-key-123",
-            allowed_origins='["http://localhost:3000", "http://example.com"]'
+            allowed_origins='["http://localhost:3000", "http://example.com"]',
         )
         origins = s.get_allowed_origins()
         assert "http://localhost:3000" in origins
@@ -132,26 +128,17 @@ class TestSettings:
 
     def test_log_level_validation(self):
         """Log level must be valid."""
-        with pytest.raises(Exception):
-            Settings(
-                jwt_secret_key="this-is-a-valid-secret-key-123",
-                log_level="INVALID"
-            )
+        with pytest.raises(ValidationError):
+            Settings(jwt_secret_key="this-is-a-valid-secret-key-123", log_level="INVALID")
 
     def test_log_level_case_insensitive(self):
         """Log level is case-insensitive."""
-        s = Settings(
-            jwt_secret_key="this-is-a-valid-secret-key-123",
-            log_level="debug"
-        )
+        s = Settings(jwt_secret_key="this-is-a-valid-secret-key-123", log_level="debug")
         assert s.log_level == "DEBUG"
 
     def test_cache_dir_resolved(self):
         """Cache dir is resolved to absolute path."""
-        s = Settings(
-            jwt_secret_key="this-is-a-valid-secret-key-123",
-            cache_dir="./cache"
-        )
+        s = Settings(jwt_secret_key="this-is-a-valid-secret-key-123", cache_dir="./cache")
         assert s.cache_dir.is_absolute()
 
     def test_database_url_from_components(self):
@@ -162,7 +149,7 @@ class TestSettings:
             postgres_password="testpass",
             postgres_host="testhost",
             postgres_port=5432,
-            postgres_db="testdb"
+            postgres_db="testdb",
         )
         url = s.get_database_url()
         assert "testuser" in url
@@ -172,10 +159,7 @@ class TestSettings:
 
     def test_database_url_override(self):
         """Direct database_url takes precedence."""
-        s = Settings(
-            jwt_secret_key="this-is-a-valid-secret-key-123",
-            database_url="postgresql://override:pass@host/db"
-        )
+        s = Settings(jwt_secret_key="this-is-a-valid-secret-key-123", database_url="postgresql://override:pass@host/db")
         assert s.get_database_url() == "postgresql://override:pass@host/db"
 
     def test_default_postgres_values(self):
